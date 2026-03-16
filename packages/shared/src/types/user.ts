@@ -21,6 +21,11 @@ export type User = z.infer<typeof userSchema>;
  * Schema para registro de usuario (sin _id, sin timestamps)
  */
 export const userRegistrationSchema = z.object({
+  name: z.string().min(2, {
+    message: 'El nombre debe tener al menos 2 caracteres'
+  }).max(100, {
+    message: 'El nombre no puede exceder 100 caracteres'
+  }),
   email: z.string().email({
     message: 'Email inválido'
   }),
