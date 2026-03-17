@@ -8,6 +8,33 @@ Hacer visible lo invisible: transformar transacciones bancarias en narrativas ac
 
 **Diferenciador clave**: La IA como narradora de insights, no como tabla de datos.
 
+## ✨ Capacidades Actuales (Slices 1-3)
+
+### 🔐 Slice 1: Onboarding y Gestión de Datos
+- ✅ Registro y autenticación con JWT
+- ✅ Cumplimiento de Ley 1581 de 2012 (Protección de Datos)
+- ✅ Importación de transacciones vía CSV con normalización inteligente
+- ✅ Entrada de gastos por lenguaje natural con IA (jerga colombiana: "50k", "lucas", "palos")
+- ✅ Persistencia en MongoDB Atlas con categorización automática
+
+### 🤖 Slice 2: Narrativas con IA
+- ✅ Generación de insights con Google Gemini 2.0 Flash
+- ✅ Tono profesional de asesor financiero premium
+- ✅ Análisis de patrones de gasto con contexto colombiano
+- ✅ Sugerencias accionables personalizadas
+
+### 📊 Slice 3: Detección Inteligente y Visualización
+- ✅ **Detección automática de suscripciones** con fuzzy matching y refinamiento con IA
+- ✅ **Dashboard visual completo** con 4 tipos de gráficos animados:
+  - Gastos por categoría (barras)
+  - Evolución temporal (línea)
+  - Distribución porcentual (pie)
+  - Análisis por día de semana (barras)
+- ✅ **Proyecciones financieras**: Costo mensual y anual de suscripciones
+- ✅ **Reactividad total**: Actualización automática sin recargas manuales
+- ✅ **Feedback visual**: Indicadores de carga y procesamiento con IA
+- ✅ **Sistema de colores consistente** en toda la aplicación
+
 ## 🏗️ Arquitectura
 
 Monorepo con npm Workspaces:
@@ -82,6 +109,34 @@ npm run lint             # Lint de todos los workspaces
 npm run format           # Format con Prettier
 ```
 
+## 🎨 Características Destacadas
+
+### 🧠 IA Conversacional
+- Entrada de gastos en lenguaje natural: *"Ayer me mecaté 20 lucas en empanadas, hoy 50k de gasolina"*
+- Detección automática de montos en jerga colombiana (k, lucas, palos)
+- Interpretación de fechas relativas (ayer, hoy, la semana pasada)
+- Categorización inteligente de transacciones
+
+### 💳 Detección de Suscripciones
+- Algoritmo híbrido: fuzzy matching + refinamiento con IA
+- Normalización de nombres (quita tildes, extensiones, sufijos empresariales)
+- Agrupación por monto similar (varianza < 1%) y nombre similar (> 70%)
+- Confirmación con mínimo 2 ocurrencias en meses diferentes
+- Proyecciones mensuales y anuales automáticas
+
+### 📈 Visualización Avanzada
+- **4 tipos de gráficos interactivos** con Recharts
+- **Animaciones fluidas** con Framer Motion
+- **Colores semánticos** por categoría (11 categorías soportadas)
+- **Análisis temporal** por día de semana para identificar picos de consumo
+- **Reactividad total**: Sin botones de recarga, todo se actualiza automáticamente
+
+### ⚡ Experiencia de Usuario
+- Feedback visual en tiempo real (spinners, indicadores de progreso)
+- Mensajes de éxito/error claros y contextualizados
+- Preview de transacciones antes de importar CSV
+- Interfaz responsive y accesible
+
 ## 🔒 Cumplimiento Legal
 
 FinanceFlow AI cumple estrictamente con la **Ley 1581 de 2012** de Protección de Datos Personales de Colombia:
@@ -111,13 +166,24 @@ Principios:
 
 Desarrollo por **slices verticales**:
 
-1. Slice 1: Onboarding y Primera Importación
-2. Slice 2: Primer Insight Wow
-3. Slice 3: Detección de Suscripciones y Análisis Temporal
-4. Slice 4: Comparación Histórica y Progreso
-5. Slice 5: Plan de Choque (Acciones y Seguimiento)
+- ✅ **Slice 1**: Onboarding y Primera Importación
+- ✅ **Slice 2**: Primer Insight Wow (Narrativas con IA)
+- ✅ **Slice 3**: Detección de Suscripciones y Análisis Temporal
+- 🚧 **Slice 4**: Comparación Histórica y Progreso (próximo)
+- ⏳ **Slice 5**: Plan de Choque (Acciones y Seguimiento)
 
-**Regla**: No se inicia un nuevo slice sin un commit limpio del anterior.
+**Regla de Oro**: No se inicia un nuevo slice sin un commit limpio del anterior.
+
+### Estado Actual: Slice 3 Completado ✅
+
+**Últimas implementaciones:**
+- Detección inteligente de suscripciones con IA
+- Dashboard visual con 4 tipos de gráficos
+- Análisis temporal por día de semana
+- Reactividad total y feedback visual mejorado
+- Sistema de colores consistente en toda la app
+
+**Próximo**: Slice 4 - Comparación histórica mes a mes y métricas de progreso
 
 ## 🤝 Contribución
 
