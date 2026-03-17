@@ -1,12 +1,16 @@
+// Cargar variables de entorno PRIMERO
+import dotenv from 'dotenv';
+import path from 'path';
+
+// Especificar ruta explícita del .env
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+
 import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import dotenv from 'dotenv';
 import { connectDB } from './config/db';
 import authRoutes from './routes/authRoutes';
-
-// Cargar variables de entorno
-dotenv.config();
+import analysisRoutes from './routes/analysisRoutes';
 
 const app: Application = express();
 const PORT = process.env.PORT || 4000;
@@ -36,6 +40,7 @@ app.get('/health', (req: Request, res: Response) => {
 
 // Rutas
 app.use('/api/auth', authRoutes);
+app.use('/api/analysis', analysisRoutes);
 
 // Ruta 404
 app.use((req: Request, res: Response) => {

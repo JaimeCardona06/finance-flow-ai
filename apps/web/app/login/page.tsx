@@ -3,25 +3,23 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { userRegistrationSchema, type UserRegistration } from '@financeflow/shared';
+import { userLoginSchema, type UserLogin } from '@financeflow/shared';
 
-export default function RegisterPage() {
+export default function LoginPage() {
   const router = useRouter();
-  const [formData, setFormData] = useState<UserRegistration>({
-    name: '',
+  const [formData, setFormData] = useState<UserLogin>({
     email: '',
-    password: '',
-    consentAccepted: false
+    password: ''
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [serverError, setServerError] = useState<string>('');
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target;
+    const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: value
     }));
     // Limpiar error del campo al editar
     if (errors[name]) {
@@ -39,7 +37,7 @@ export default function RegisterPage() {
     setServerError('');
 
     // Validar con Zod
-    const validation = userRegistrationSchema.safeParse(formData);
+    const validation = userLoginSchema.safeParse(formData);
 
     if (!validation.success) {
       const fieldErrors: Record<string, string> = {};
@@ -54,7 +52,7 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:4000/api/auth/register', {
+      const response = await fetch('http://localhost:4000/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -65,8 +63,8 @@ export default function RegisterPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        if (data.error?.code === 'USER_ALREADY_EXISTS') {
-          setServerError('Ya existe una cuenta con este email');
+        if (data.error?.code === 'INVALID_CREDENTIALS') {
+          setServerError('Email o contraseña incorrectos');
         } else if (data.error?.details) {
           const fieldErrors: Record<string, string> = {};
           data.error.details.forEach((detail: any) => {
@@ -74,17 +72,17 @@ export default function RegisterPage() {
           });
           setErrors(fieldErrors);
         } else {
-          setServerError(data.error?.message || 'Error al registrar usuario');
+          setServerError(data.error?.message || 'Error al iniciar sesión');
         }
         return;
       }
 
-      // Registro exitoso
-      alert('¡Registro exitoso! Usuario creado correctamente.');
-      console.log('Usuario registrado:', data.data.user);
-      
-      // Redirigir al login o dashboard (por ahora solo mostramos mensaje)
-      router.push('/');
+      // Login exitoso - guardar token en localStorage
+      localStorage.setItem('token', data.data.token);
+      localStorage.setItem('user', JSON.stringify(data.data.user));
+
+      // Redirigir a análisis
+      router.push('/analysis');
 
     } catch (error) {
       console.error('Error:', error);
@@ -99,10 +97,10 @@ export default function RegisterPage() {
       <div className="max-w-md w-full space-y-8">
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Crear cuenta en FinanceFlow AI
+            Iniciar sesión
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Descubre dónde se va tu dinero sin darte cuenta
+            Accede a tus insights financieros
           </p>
         </div>
 
@@ -114,25 +112,6 @@ export default function RegisterPage() {
           )}
 
           <div className="rounded-md shadow-sm space-y-4">
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                Nombre completo
-              </label>
-              <input
-                id="name"
-                name="name"
-                type="text"
-                required
-                value={formData.name}
-                onChange={handleChange}
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Juan Pérez"
-              />
-              {errors.name && (
-                <p className="mt-1 text-sm text-red-600">{errors.name}</p>
-              )}
-            </div>
-
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                 Email
@@ -164,38 +143,10 @@ export default function RegisterPage() {
                 value={formData.password}
                 onChange={handleChange}
                 className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Mínimo 8 caracteres"
+                placeholder="Tu contraseña"
               />
               {errors.password && (
                 <p className="mt-1 text-sm text-red-600">{errors.password}</p>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-start">
-            <div className="flex items-center h-5">
-              <input
-                id="consentAccepted"
-                name="consentAccepted"
-                type="checkbox"
-                checked={formData.consentAccepted}
-                onChange={handleChange}
-                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-              />
-            </div>
-            <div className="ml-3 text-sm">
-              <label htmlFor="consentAccepted" className="font-medium text-gray-700">
-                Acepto la política de privacidad y el tratamiento de mis datos personales
-              </label>
-              <p className="text-gray-500 mt-1">
-                De acuerdo con la Ley 1581 de 2012, autorizo el tratamiento de mis datos financieros 
-                para análisis de gastos hormiga. Puedes consultar nuestra{' '}
-                <a href="/privacy" className="text-indigo-600 hover:text-indigo-500">
-                  política de privacidad completa
-                </a>.
-              </p>
-              {errors.consentAccepted && (
-                <p className="mt-1 text-sm text-red-600">{errors.consentAccepted}</p>
               )}
             </div>
           </div>
@@ -206,15 +157,15 @@ export default function RegisterPage() {
               disabled={isLoading}
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
-              {isLoading ? 'Registrando...' : 'Crear cuenta'}
+              {isLoading ? 'Iniciando sesión...' : 'Iniciar sesión'}
             </button>
           </div>
 
           <div className="text-center">
             <p className="text-sm text-gray-600">
-              ¿Ya tienes cuenta?{' '}
-              <Link href="/login" className="font-medium text-indigo-600 hover:text-indigo-500">
-                Inicia sesión
+              ¿No tienes cuenta?{' '}
+              <Link href="/register" className="font-medium text-indigo-600 hover:text-indigo-500">
+                Regístrate
               </Link>
             </p>
           </div>
