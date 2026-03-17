@@ -378,14 +378,12 @@ export default function AnalysisPage() {
         <div className="bg-white rounded-xl shadow-md p-6 mb-8 border border-gray-100">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold text-gray-900">Tus Transacciones</h2>
-            <button
-              onClick={() => loadTransactions(token)}
-              className="flex items-center gap-2 text-sm bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors"
-              disabled={isLoadingTransactions}
-            >
-              <RefreshCw className={`w-4 h-4 ${isLoadingTransactions ? 'animate-spin' : ''}`} />
-              Recargar
-            </button>
+            {isLoadingTransactions && (
+              <div className="flex items-center gap-2 text-sm text-indigo-600">
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                <span>Actualizando...</span>
+              </div>
+            )}
           </div>
 
           {isLoadingTransactions ? (
@@ -444,17 +442,25 @@ export default function AnalysisPage() {
                   Suscripciones y Gastos Recurrentes
                 </h2>
                 <p className="text-sm text-gray-600 mt-1">
-                  Detectamos {subscriptions.length} {subscriptions.length === 1 ? 'suscripción' : 'suscripciones'} activas
+                  {isLoadingSubscriptions ? (
+                    <span className="flex items-center gap-2">
+                      <RefreshCw className="w-3 h-3 animate-spin" />
+                      Detectando suscripciones...
+                    </span>
+                  ) : (
+                    `Detectamos ${subscriptions.length} ${subscriptions.length === 1 ? 'suscripción' : 'suscripciones'} activas`
+                  )}
                 </p>
               </div>
-              <button
-                onClick={() => loadSubscriptions(token)}
-                className="flex items-center gap-2 text-sm bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors"
-                disabled={isLoadingSubscriptions}
-              >
-                <RefreshCw className={`w-4 h-4 ${isLoadingSubscriptions ? 'animate-spin' : ''}`} />
-                Recargar
-              </button>
+              {!isLoadingSubscriptions && (
+                <button
+                  onClick={() => loadSubscriptions(token)}
+                  className="flex items-center gap-2 text-sm text-gray-600 hover:text-indigo-600 transition-colors"
+                  title="Recargar suscripciones"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                </button>
+              )}
             </div>
 
             {/* Resumen de suscripciones */}

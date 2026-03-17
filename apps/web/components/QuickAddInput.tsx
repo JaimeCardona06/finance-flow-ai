@@ -89,10 +89,14 @@ export function QuickAddInput({ onSuccess, token }: QuickAddInputProps) {
           <button
             type="submit"
             disabled={isLoading || !text.trim()}
-            className="absolute bottom-3 right-3 bg-indigo-600 text-white p-2 rounded-lg hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+            className="absolute bottom-3 right-3 bg-indigo-600 text-white px-3 py-2 rounded-lg hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+            title={isLoading ? 'Analizando con IA...' : 'Enviar'}
           >
             {isLoading ? (
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <span className="text-xs whitespace-nowrap">Analizando...</span>
+              </>
             ) : (
               <Send className="w-5 h-5" />
             )}
