@@ -81,7 +81,6 @@ export default function RegisterPage() {
 
       // Registro exitoso
       alert('¡Registro exitoso! Usuario creado correctamente.');
-      console.log('Usuario registrado:', data.data.user);
       
       // Redirigir al login o dashboard (por ahora solo mostramos mensaje)
       router.push('/');

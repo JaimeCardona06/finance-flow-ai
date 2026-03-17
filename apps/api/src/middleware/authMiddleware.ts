@@ -10,12 +10,13 @@ export interface JWTPayload {
 }
 
 /**
- * Extender Request de Express para incluir user
+ * Extender Request de Express para incluir userId
  */
 declare global {
   namespace Express {
     interface Request {
       user?: JWTPayload;
+      userId?: string;
     }
   }
 }
@@ -53,6 +54,7 @@ export function authenticateToken(
 
     const decoded = jwt.verify(token, jwtSecret) as JWTPayload;
     req.user = decoded;
+    req.userId = decoded.userId; // Agregar userId directamente para facilitar acceso
     next();
 
   } catch (error) {

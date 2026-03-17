@@ -3,48 +3,65 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { InsightCard } from '../../components/InsightCard';
+import { CsvUploader } from '../../components/CsvUploader';
+import { QuickAddInput } from '../../components/QuickAddInput';
+import { SubscriptionCard } from '../../components/SubscriptionCard';
+import { WeekdayChart } from '../../components/WeekdayChart';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { TrendingUp, DollarSign, Calendar, PieChart as PieChartIcon, LogOut, Sparkles, RefreshCw, CreditCard } from 'lucide-react';
 
-// Gastos de ejemplo predefinidos
-const SAMPLE_TRANSACTIONS = [
-  { description: 'Café Juan Valdez', amount: 8500, date: '2024-01-15', category: 'café/bebidas' },
-  { description: 'Almuerzo ejecutivo', amount: 22000, date: '2024-01-15', category: 'comida rápida' },
-  { description: 'Uber al trabajo', amount: 12000, date: '2024-01-16', category: 'transporte' },
-  { description: 'Café Starbucks', amount: 9500, date: '2024-01-16', category: 'café/bebidas' },
-  { description: 'Rappi domicilio', amount: 35000, date: '2024-01-17', category: 'comida rápida' },
-  { description: 'Netflix suscripción', amount: 44900, date: '2024-01-18', category: 'suscripciones' },
-  { description: 'Café tienda barrio', amount: 3000, date: '2024-01-18', category: 'café/bebidas' },
-  { description: 'Uber Eats', amount: 28000, date: '2024-01-19', category: 'comida rápida' },
-  { description: 'Spotify Premium', amount: 16900, date: '2024-01-20', category: 'suscripciones' },
-  { description: 'Café Juan Valdez', amount: 8500, date: '2024-01-20', category: 'café/bebidas' }
-];
+// Mapa de colores por categoría (sincronizado en todo el dashboard)
+const CATEGORY_COLORS: Record<string, string> = {
+  'café/bebidas': '#8B4513',      // Marrón café
+  'comida rápida': '#FF6B6B',     // Rojo coral
+  'comida': '#FFA500',            // Naranja
+  'transporte': '#4ECDC4',        // Turquesa
+  'suscripciones': '#9B59B6',     // Púrpura
+  'entretenimiento': '#F38181',   // Rosa salmón
+  'hogar': '#3498DB',             // Azul
+  'salud': '#2ECC71',             // Verde
+  'educación': '#E74C3C',         // Rojo
+  'servicios': '#F39C12',         // Amarillo dorado
+  'misceláneos': '#95A5A6'        // Gris neutro
+};
 
-// Pool de gastos para generar aleatorios
-const RANDOM_EXPENSES = [
-  { description: 'Rappi domicilio', amount: [25000, 35000, 45000], category: 'comida rápida' },
-  { description: 'Uber Eats', amount: [20000, 30000, 40000], category: 'comida rápida' },
-  { description: 'Café Juan Valdez', amount: [7000, 8500, 10000], category: 'café/bebidas' },
-  { description: 'Starbucks', amount: [9000, 12000, 15000], category: 'café/bebidas' },
-  { description: 'Uber', amount: [8000, 12000, 18000], category: 'transporte' },
-  { description: 'DiDi', amount: [7000, 10000, 15000], category: 'transporte' },
-  { description: 'Netflix', amount: [44900], category: 'suscripciones' },
-  { description: 'Spotify', amount: [16900], category: 'suscripciones' },
-  { description: 'HBO Max', amount: [35900], category: 'suscripciones' },
-  { description: 'Almuerzo ejecutivo', amount: [18000, 22000, 28000], category: 'comida rápida' },
-  { description: 'Tienda Oxxo', amount: [5000, 8000, 12000], category: 'misceláneos' },
-  { description: 'Cine', amount: [25000, 30000], category: 'entretenimiento' }
-];
+// Función helper para obtener color con fallback
+const getCategoryColor = (category?: string): string => {
+  if (!category) return '#95A5A6'; // Gris neutro por defecto
+  return CATEGORY_COLORS[category.toLowerCase()] || '#95A5A6';
+};
+
+interface Transaction {
+  _id?: string;
+  description: string;
+  amount: number;
+  date: string;
+  category?: string;
+}
+
+interface Subscription {
+  serviceName: string;
+  amount: number;
+  frequency: number;
+  monthlyEstimate: number;
+  annualEstimate: number;
+  lastCharge: string;
+  transactions: string[];
+}
 
 export default function AnalysisPage() {
   const router = useRouter();
   const [narrative, setNarrative] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
   const [error, setError] = useState<string>('');
   const [token, setToken] = useState<string>('');
   const [user, setUser] = useState<any>(null);
-  const [transactions, setTransactions] = useState(SAMPLE_TRANSACTIONS);
-  const [showCustomInput, setShowCustomInput] = useState(false);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [isLoadingSubscriptions, setIsLoadingSubscriptions] = useState(false);
 
-  // Verificar autenticación al cargar la página
+  // Verificar autenticación y cargar transacciones
   useEffect(() => {
     const storedToken = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
@@ -58,34 +75,84 @@ export default function AnalysisPage() {
     if (storedUser) {
       setUser(JSON.parse(storedUser));
     }
+
+    // Cargar transacciones desde la BD
+    loadTransactions(storedToken);
+    
+    // Cargar suscripciones
+    loadSubscriptions(storedToken);
   }, [router]);
 
-  const generateRandomTransactions = () => {
-    const count = Math.floor(Math.random() * 5) + 8; // 8-12 transacciones
-    const randomTxs = [];
-    const today = new Date();
-
-    for (let i = 0; i < count; i++) {
-      const expense = RANDOM_EXPENSES[Math.floor(Math.random() * RANDOM_EXPENSES.length)];
-      const amounts = expense.amount;
-      const amount = amounts[Math.floor(Math.random() * amounts.length)];
-      const daysAgo = Math.floor(Math.random() * 30);
-      const date = new Date(today);
-      date.setDate(date.getDate() - daysAgo);
-
-      randomTxs.push({
-        description: expense.description,
-        amount,
-        date: date.toISOString().split('T')[0],
-        category: expense.category
+  const loadTransactions = async (authToken: string) => {
+    setIsLoadingTransactions(true);
+    try {
+      const response = await fetch('http://localhost:4000/api/transactions', {
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
       });
-    }
 
-    setTransactions(randomTxs.sort((a, b) => b.date.localeCompare(a.date)));
-    setNarrative(''); // Limpiar narrativa anterior
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          router.push('/login');
+          return;
+        }
+        console.error('Error al cargar transacciones:', data.error);
+        setTransactions([]);
+        return;
+      }
+
+      setTransactions(data.data.transactions || []);
+    } catch (err) {
+      console.error('Error:', err);
+      setTransactions([]);
+    } finally {
+      setIsLoadingTransactions(false);
+    }
+  };
+
+  const loadSubscriptions = async (authToken: string) => {
+    setIsLoadingSubscriptions(true);
+    try {
+      const response = await fetch('http://localhost:4000/api/subscriptions', {
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          router.push('/login');
+          return;
+        }
+        console.error('Error al cargar suscripciones:', data.error);
+        setSubscriptions([]);
+        return;
+      }
+
+      setSubscriptions(data.data.subscriptions || []);
+    } catch (err) {
+      console.error('Error:', err);
+      setSubscriptions([]);
+    } finally {
+      setIsLoadingSubscriptions(false);
+    }
   };
 
   const handleGenerateNarrative = async () => {
+    if (transactions.length === 0) {
+      setError('No hay transacciones para analizar. Importa o agrega transacciones primero.');
+      return;
+    }
+
     setIsLoading(true);
     setError('');
     setNarrative('');
@@ -98,7 +165,12 @@ export default function AnalysisPage() {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          transactions
+          transactions: transactions.map(t => ({
+            description: t.description,
+            amount: t.amount,
+            date: t.date,
+            category: t.category
+          }))
         })
       });
 
@@ -116,7 +188,6 @@ export default function AnalysisPage() {
       }
 
       setNarrative(data.data.narrative);
-      console.log('Metadata:', data.data.metadata);
 
     } catch (err) {
       console.error('Error:', err);
@@ -134,7 +205,7 @@ export default function AnalysisPage() {
 
   if (!token) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Verificando autenticación...</p>
@@ -143,110 +214,407 @@ export default function AnalysisPage() {
     );
   }
 
+  // Preparar datos para gráficos
+  const categoryData = Object.entries(
+    transactions.reduce((acc, t) => {
+      const cat = t.category || 'misceláneos';
+      acc[cat] = (acc[cat] || 0) + t.amount;
+      return acc;
+    }, {} as Record<string, number>)
+  ).map(([name, value]) => ({
+    name: name.charAt(0).toUpperCase() + name.slice(1),
+    value,
+    color: getCategoryColor(name)
+  })).sort((a, b) => b.value - a.value);
+
+  // Análisis temporal: agrupar por fecha y sumar correctamente
+  const timelineData = transactions
+    .reduce((acc, t) => {
+      const date = t.date;
+      const existing = acc.find(item => item.date === date);
+      if (existing) {
+        existing.amount += t.amount;
+      } else {
+        acc.push({ date, amount: t.amount });
+      }
+      return acc;
+    }, [] as { date: string; amount: number }[])
+    .sort((a, b) => a.date.localeCompare(b.date)) // Ordenar cronológicamente
+    .map(item => ({
+      ...item,
+      dateFormatted: new Date(item.date).toLocaleDateString('es-CO', { month: 'short', day: 'numeric' })
+    }));
+
+  // Análisis por día de semana
+  const weekdayData = transactions.reduce((acc, t) => {
+    const date = new Date(t.date);
+    const dayOfWeek = date.getDay(); // 0 = Domingo, 6 = Sábado
+    const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+    const dayName = dayNames[dayOfWeek];
+    
+    if (!acc[dayName]) {
+      acc[dayName] = { day: dayName, amount: 0, count: 0 };
+    }
+    acc[dayName].amount += t.amount;
+    acc[dayName].count += 1;
+    
+    return acc;
+  }, {} as Record<string, { day: string; amount: number; count: number }>);
+
+  const weekdayChartData = Object.values(weekdayData)
+    .sort((a, b) => {
+      const order = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+      return order.indexOf(a.day) - order.indexOf(b.day);
+    })
+    .map(item => ({
+      day: item.day,
+      amount: item.amount,
+      average: Math.round(item.amount / item.count)
+    }));
+
+  const totalAmount = transactions.reduce((sum, t) => sum + t.amount, 0);
+  const avgAmount = transactions.length > 0 ? Math.round(totalAmount / transactions.length) : 0;
+
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-3xl mx-auto">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              Análisis con IA
-            </h1>
-            {user && (
-              <p className="text-gray-600 mt-1">
-                Bienvenido, {user.name}
-              </p>
-            )}
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                <Sparkles className="w-6 h-6 text-indigo-600" />
+                Dashboard Financiero
+              </h1>
+              {user && (
+                <p className="text-sm text-gray-600 mt-1">
+                  Bienvenido, {user.name}
+                </p>
+              )}
+            </div>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              Cerrar sesión
+            </button>
           </div>
-          <button
-            onClick={handleLogout}
-            className="text-sm text-gray-600 hover:text-gray-900"
-          >
-            Cerrar sesión
-          </button>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Total Gastado</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  ${totalAmount.toLocaleString('es-CO')}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">COP</p>
+              </div>
+              <div className="bg-indigo-100 p-3 rounded-lg">
+                <DollarSign className="w-6 h-6 text-indigo-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Transacciones</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {transactions.length}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">en el período</p>
+              </div>
+              <div className="bg-purple-100 p-3 rounded-lg">
+                <TrendingUp className="w-6 h-6 text-purple-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Ticket Promedio</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  ${avgAmount.toLocaleString('es-CO')}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">COP</p>
+              </div>
+              <div className="bg-green-100 p-3 rounded-lg">
+                <Calendar className="w-6 h-6 text-green-600" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* CSV Uploader */}
+        <div className="mb-8">
+          <CsvUploader 
+            token={token} 
+            onUploadSuccess={() => {
+              loadTransactions(token);
+              loadSubscriptions(token); // Recargar suscripciones también
+            }} 
+          />
+        </div>
+
+        {/* Quick Add con IA */}
+        <div className="mb-8">
+          <QuickAddInput 
+            token={token} 
+            onSuccess={() => {
+              loadTransactions(token);
+              loadSubscriptions(token); // Recargar suscripciones también
+            }} 
+          />
         </div>
 
         {/* Panel de transacciones */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <div className="bg-white rounded-xl shadow-md p-6 mb-8 border border-gray-100">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold">Tus Transacciones</h2>
-            <div className="space-x-2">
-              <button
-                onClick={generateRandomTransactions}
-                className="text-sm bg-gray-100 text-gray-700 px-3 py-1 rounded hover:bg-gray-200"
-              >
-                🎲 Generar Aleatorios
-              </button>
-              <button
-                onClick={() => setShowCustomInput(!showCustomInput)}
-                className="text-sm bg-gray-100 text-gray-700 px-3 py-1 rounded hover:bg-gray-200"
-              >
-                {showCustomInput ? '✕ Cerrar' : '✏️ Personalizar'}
-              </button>
-            </div>
+            <h2 className="text-lg font-semibold text-gray-900">Tus Transacciones</h2>
+            {isLoadingTransactions && (
+              <div className="flex items-center gap-2 text-sm text-indigo-600">
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                <span>Actualizando...</span>
+              </div>
+            )}
           </div>
 
-          {showCustomInput && (
-            <div className="mb-4 p-4 bg-gray-50 rounded-md">
-              <p className="text-xs text-gray-600 mb-2">
-                Pega tus gastos (formato: descripción, monto, fecha)
-              </p>
-              <textarea
-                className="w-full h-32 p-2 border border-gray-300 rounded text-sm font-mono"
-                placeholder="Café Juan Valdez, 8500, 2024-01-15&#10;Rappi domicilio, 35000, 2024-01-16"
-                onChange={(e) => {
-                  const lines = e.target.value.split('\n').filter(l => l.trim());
-                  const parsed = lines.map(line => {
-                    const [desc, amt, date] = line.split(',').map(s => s.trim());
-                    return {
-                      description: desc || 'Gasto',
-                      amount: parseInt(amt) || 0,
-                      date: date || new Date().toISOString().split('T')[0],
-                      category: 'misceláneos'
-                    };
-                  }).filter(t => t.amount > 0);
-                  if (parsed.length > 0) {
-                    setTransactions(parsed);
-                  }
-                }}
-              />
+          {isLoadingTransactions ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+              <span className="ml-3 text-gray-600">Cargando transacciones...</span>
+            </div>
+          ) : transactions.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-gray-600">No tienes transacciones aún.</p>
+              <p className="text-sm text-gray-500 mt-2">Importa un CSV o agrega gastos manualmente.</p>
+            </div>
+          ) : (
+            <div className="bg-gray-50 p-4 rounded-lg max-h-60 overflow-y-auto border border-gray-200">
+              <ul className="space-y-2 text-sm">
+                {transactions.map((t, i) => (
+                  <li key={t._id || i} className="flex justify-between items-center py-2 border-b border-gray-200 last:border-0">
+                    <div className="flex items-center gap-3">
+                      <div 
+                        className="w-3 h-3 rounded-full flex-shrink-0" 
+                        style={{ backgroundColor: getCategoryColor(t.category) }}
+                        title={t.category || 'Sin categoría'}
+                      />
+                      <div className="flex flex-col">
+                        <span className="text-gray-700">{t.description}</span>
+                        <span className="text-xs text-gray-500">{t.category || 'misceláneos'}</span>
+                      </div>
+                    </div>
+                    <span className="font-medium text-gray-900">${t.amount.toLocaleString('es-CO')}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
-
-          <div className="bg-gray-50 p-4 rounded-md max-h-60 overflow-y-auto">
-            <ul className="space-y-2 text-sm">
-              {transactions.map((t, i) => (
-                <li key={i} className="flex justify-between">
-                  <span className="text-gray-700">{t.description}</span>
-                  <span className="font-medium">${t.amount.toLocaleString('es-CO')} COP</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <p className="text-xs text-gray-500 mt-3">
-            Total: ${transactions.reduce((sum, t) => sum + t.amount, 0).toLocaleString('es-CO')} COP
-            {' • '}
-            {transactions.length} transacciones
-          </p>
         </div>
 
         {/* Botón de generación */}
-        <div className="mb-6">
+        <div className="mb-8">
           <button
             onClick={handleGenerateNarrative}
-            disabled={isLoading}
-            className="w-full bg-indigo-600 text-white px-6 py-3 rounded-md font-medium hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+            disabled={isLoading || transactions.length === 0}
+            className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-4 rounded-xl font-medium hover:from-indigo-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
           >
-            {isLoading ? '🤖 Analizando con IA...' : '✨ Generar Insight con IA'}
+            <Sparkles className="w-5 h-5" />
+            {isLoading ? 'Analizando con IA...' : 'Generar Insight con IA'}
           </button>
         </div>
 
-        {/* Resultado */}
-        <InsightCard 
-          narrative={narrative}
-          isLoading={isLoading}
-          error={error}
-        />
+        {/* Sección de Suscripciones */}
+        {subscriptions.length > 0 && (
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                  <CreditCard className="w-6 h-6 text-indigo-600" />
+                  Suscripciones y Gastos Recurrentes
+                </h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  {isLoadingSubscriptions ? (
+                    <span className="flex items-center gap-2">
+                      <RefreshCw className="w-3 h-3 animate-spin" />
+                      Detectando suscripciones...
+                    </span>
+                  ) : (
+                    `Detectamos ${subscriptions.length} ${subscriptions.length === 1 ? 'suscripción' : 'suscripciones'} activas`
+                  )}
+                </p>
+              </div>
+              {!isLoadingSubscriptions && (
+                <button
+                  onClick={() => loadSubscriptions(token)}
+                  className="flex items-center gap-2 text-sm text-gray-600 hover:text-indigo-600 transition-colors"
+                  title="Recargar suscripciones"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Resumen de suscripciones */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl shadow-lg p-6 text-white">
+                <p className="text-sm opacity-90 mb-1">Total Mensual en Suscripciones</p>
+                <p className="text-3xl font-bold">
+                  ${subscriptions.reduce((sum, sub) => sum + sub.monthlyEstimate, 0).toLocaleString('es-CO')}
+                </p>
+                <p className="text-xs opacity-75 mt-2">COP por mes</p>
+              </div>
+
+              <div className="bg-gradient-to-r from-pink-500 to-rose-600 rounded-xl shadow-lg p-6 text-white">
+                <p className="text-sm opacity-90 mb-1">Proyección Anual</p>
+                <p className="text-3xl font-bold">
+                  ${subscriptions.reduce((sum, sub) => sum + sub.annualEstimate, 0).toLocaleString('es-CO')}
+                </p>
+                <p className="text-xs opacity-75 mt-2">COP por año</p>
+              </div>
+            </div>
+
+            {/* Grid de tarjetas de suscripciones */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {subscriptions.map((subscription, index) => (
+                <SubscriptionCard
+                  key={`${subscription.serviceName}-${index}`}
+                  serviceName={subscription.serviceName}
+                  amount={subscription.amount}
+                  frequency={subscription.frequency}
+                  monthlyEstimate={subscription.monthlyEstimate}
+                  annualEstimate={subscription.annualEstimate}
+                  lastCharge={subscription.lastCharge}
+                  index={index}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Layout de 2 columnas: Insight + Gráficos */}
+        {transactions.length > 0 && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Columna izquierda: Insight de IA */}
+            <div className="lg:col-span-1">
+              <InsightCard 
+                narrative={narrative}
+                isLoading={isLoading}
+                error={error}
+              />
+            </div>
+
+            {/* Columna derecha: Gráficos */}
+            <div className="lg:col-span-1 space-y-6">
+              {/* Gráfico de barras por categoría */}
+              {categoryData.length > 0 && (
+                <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <PieChartIcon className="w-5 h-5 text-indigo-600" />
+                    Gastos por Categoría
+                  </h3>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={categoryData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis 
+                        dataKey="name" 
+                        tick={{ fontSize: 12 }}
+                        angle={-45}
+                        textAnchor="end"
+                        height={80}
+                      />
+                      <YAxis tick={{ fontSize: 12 }} />
+                      <Tooltip 
+                        formatter={(value: any) => `$${Number(value || 0).toLocaleString('es-CO')} COP`}
+                        contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
+                      />
+                      <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                        {categoryData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+
+              {/* Gráfico de línea temporal */}
+              {timelineData.length > 0 && (
+                <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-indigo-600" />
+                    Evolución Temporal
+                  </h3>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={timelineData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis 
+                        dataKey="dateFormatted" 
+                        tick={{ fontSize: 12 }}
+                      />
+                      <YAxis tick={{ fontSize: 12 }} />
+                      <Tooltip 
+                        formatter={(value: any) => `$${Number(value || 0).toLocaleString('es-CO')} COP`}
+                        contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="amount" 
+                        stroke="#6366f1" 
+                        strokeWidth={3}
+                        dot={{ fill: '#6366f1', r: 4 }}
+                        activeDot={{ r: 6 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+
+              {/* Gráfico de pie (distribución) */}
+              {categoryData.length > 0 && (
+                <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <PieChartIcon className="w-5 h-5 text-indigo-600" />
+                    Distribución de Gastos
+                  </h3>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={categoryData}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, percent }: any) => `${name}: ${((percent || 0) * 100).toFixed(0)}%`}
+                        outerRadius={100}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {categoryData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        formatter={(value: any) => `$${Number(value || 0).toLocaleString('es-CO')} COP`}
+                        contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+
+              {/* Gráfico de gastos por día de semana */}
+              <WeekdayChart data={weekdayChartData} />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -11,6 +11,8 @@ import helmet from 'helmet';
 import { connectDB } from './config/db';
 import authRoutes from './routes/authRoutes';
 import analysisRoutes from './routes/analysisRoutes';
+import transactionRoutes from './routes/transactionRoutes';
+import subscriptionRoutes from './routes/subscriptionRoutes';
 
 const app: Application = express();
 const PORT = process.env.PORT || 4000;
@@ -41,6 +43,8 @@ app.get('/health', (req: Request, res: Response) => {
 // Rutas
 app.use('/api/auth', authRoutes);
 app.use('/api/analysis', analysisRoutes);
+app.use('/api/transactions', transactionRoutes);
+app.use('/api/subscriptions', subscriptionRoutes);
 
 // Ruta 404
 app.use((req: Request, res: Response) => {

@@ -15,14 +15,18 @@
     "@financeflow/ui": "*",
     "@tanstack/react-query": "^5.17.0",
     "framer-motion": "^11.0.0",
+    "lucide-react": "^0.577.0",
     "next": "^14.0.4",
+    "papaparse": "^5.5.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-hook-form": "^7.49.2",
     "react-markdown": "^10.1.0",
+    "recharts": "^3.8.0",
     "zod": "^3.22.4"
   },
   "devDependencies": {
+    "@types/papaparse": "^5.5.2",
     "@types/react": "^18.2.45",
     "@types/react-dom": "^18.2.18",
     "autoprefixer": "^10.4.16",

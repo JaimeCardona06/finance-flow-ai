@@ -28,8 +28,6 @@ export async function generateNarrative(
   try {
     const apiKey = process.env.GEMINI_API_KEY;
     
-    console.log('🔑 [aiService] Clave Gemini detectada:', apiKey ? 'SÍ' : 'NO');
-    
     if (!apiKey) {
       throw new Error('GEMINI_API_KEY no está configurada');
     }
@@ -153,6 +151,106 @@ He analizado tus ${transactions.length} transacciones por un total de **${totalA
 ${transactions.slice(0, 5).map(t => `- **${t.description}**: ${t.amount.toLocaleString('es-CO')} COP`).join('\n')}
 
 **Nota:** La conexión con Gemini falló. Verifica que tu API Key sea válida y esté generada desde [Google AI Studio](https://aistudio.google.com/app/apikey).`;
+  }
+}
+
+/**
+ * Extraer transacciones desde lenguaje natural usando Gemini
+ * Soporta jerga colombiana: "50k", "50 lucas", múltiples gastos separados por comas
+ * 
+ * @param text - Texto del usuario describiendo sus gastos
+ * @returns Array de transacciones extraídas
+ */
+export async function extractTransactionsFromText(text: string): Promise<any[]> {
+  try {
+    const apiKey = process.env.GEMINI_API_KEY;
+    
+    if (!apiKey) {
+      throw new Error('GEMINI_API_KEY no está configurada');
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+
+    const prompt = `Actúa como un extractor de datos financieros experto en jerga colombiana. Del texto del usuario, extrae una LISTA de objetos JSON. Si el usuario menciona varios gastos (separados por comas, "y", o puntos), extráelos todos.
+
+TEXTO DEL USUARIO:
+"${text}"
+
+INSTRUCCIONES CRÍTICAS:
+1. Extrae TODOS los gastos mencionados (pueden ser múltiples)
+2. Cada objeto debe tener:
+   - "description": Nombre limpio del gasto (ej: "Starbucks", "Gasolina", "Arriendo")
+   - "amount": Número entero en COP (ej: si dice "50k" o "50 lucas", devuelve 50000; si dice "15k", devuelve 15000; si dice "200", devuelve 200000 si el contexto indica que son miles)
+   - "date": Formato ISO YYYY-MM-DD (asume hoy: ${today} si no se especifica; si dice "ayer", usa ${new Date(Date.now() - 86400000).toISOString().split('T')[0]})
+   - "category": Elige la más adecuada entre ["café/bebidas", "comida rápida", "transporte", "suscripciones", "entretenimiento", "misceláneos"]
+
+3. JERGA COLOMBIANA:
+   - "k" o "lucas" = mil (ej: "50k" = 50000, "50 lucas" = 50000)
+   - "palos" = millones (ej: "2 palos" = 2000000)
+   - Si solo dice un número sin unidad y es menor a 1000, asume que son miles (ej: "200" en contexto de arriendo = 200000)
+
+4. CATEGORÍAS:
+   - café/bebidas: Café, tinto, bebidas
+   - comida rápida: Almuerzo, comida, restaurante, domicilio, Rappi, Uber Eats
+   - transporte: Uber, taxi, gasolina, DiDi, bus, metro
+   - suscripciones: Netflix, Spotify, HBO, servicios mensuales
+   - entretenimiento: Cine, concierto, bar, rumba
+   - misceláneos: Arriendo, servicios, compras, otros
+
+5. Responde ÚNICAMENTE con el array de JSON, sin texto adicional, sin markdown, sin explicaciones.
+
+FORMATO DE RESPUESTA (ejemplo):
+[
+  {"description": "Almuerzo", "amount": 15000, "date": "${today}", "category": "comida rápida"},
+  {"description": "Gasolina", "amount": 50000, "date": "${today}", "category": "transporte"}
+]
+
+GENERA EL ARRAY JSON:`;
+
+    // Configurar Gemini para respuesta JSON
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ 
+      model: "models/gemini-2.5-flash",
+      generationConfig: {
+        temperature: 0.3, // Más determinístico para extracción
+        topP: 0.95,
+        topK: 40,
+        maxOutputTokens: 8192,
+        responseMimeType: 'application/json'
+      }
+    });
+
+    const result = await model.generateContent(prompt);
+    const response = result.response;
+    let responseText = response.text();
+
+    // Limpiar respuesta (por si viene con markdown)
+    responseText = responseText.trim();
+    if (responseText.startsWith('```json')) {
+      responseText = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+    }
+
+    // Parsear JSON
+    const transactions = JSON.parse(responseText);
+
+    // Validar que sea un array
+    if (!Array.isArray(transactions)) {
+      throw new Error('La respuesta no es un array válido');
+    }
+
+    // Validar estructura de cada transacción
+    const validTransactions = transactions.filter(t => 
+      t.description && 
+      typeof t.amount === 'number' && 
+      t.amount > 0 &&
+      t.date
+    );
+
+    return validTransactions;
+
+  } catch (error) {
+    console.error('Error al extraer transacciones con Gemini:', error);
+    throw error;
   }
 }
 
