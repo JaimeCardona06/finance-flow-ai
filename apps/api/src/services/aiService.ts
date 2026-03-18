@@ -16,14 +16,21 @@ interface TransactionSummary {
 }
 
 /**
- * Generar narrativa financiera usando Gemini 1.5 Flash
+ * Generar narrativa financiera usando Gemini 2.5 Flash
  * Implementación basada en la documentación oficial de Google AI
  * 
  * @param transactions - Array de transacciones del usuario
+ * @param comparisonData - Datos de comparación mes actual vs anterior (opcional)
  * @returns Narrativa generada por la IA (máx. 3 párrafos)
  */
 export async function generateNarrative(
-  transactions: TransactionSummary[]
+  transactions: TransactionSummary[],
+  comparisonData?: {
+    currentMonth: { totalAmount: number; month: string };
+    previousMonth: { totalAmount: number; month: string };
+    delta: { amount: number; percentage: number; trend: 'up' | 'down' | 'stable' };
+    improvement: boolean;
+  }
 ): Promise<string> {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -67,6 +74,28 @@ export async function generateNarrative(
     const topMerchant = Object.entries(merchantFrequency)
       .sort((a, b) => b[1].total - a[1].total)[0];
 
+    // Construir contexto histórico si está disponible
+    let historicalContext = '';
+    if (comparisonData) {
+      const { currentMonth, previousMonth, delta, improvement } = comparisonData;
+      const formatMonth = (monthStr: string) => {
+        const [year, month] = monthStr.split('-');
+        return new Date(parseInt(year), parseInt(month) - 1).toLocaleDateString('es-CO', {
+          month: 'long',
+          year: 'numeric'
+        });
+      };
+
+      historicalContext = `
+CONTEXTO HISTÓRICO (COMPARACIÓN MENSUAL):
+- Mes actual (${formatMonth(currentMonth.month)}): **${currentMonth.totalAmount.toLocaleString('es-CO')} COP**
+- Mes anterior (${formatMonth(previousMonth.month)}): **${previousMonth.totalAmount.toLocaleString('es-CO')} COP**
+- Diferencia: **${delta.amount > 0 ? '+' : ''}${delta.amount.toLocaleString('es-CO')} COP** (${delta.percentage > 0 ? '+' : ''}${delta.percentage.toFixed(1)}%)
+- Tendencia: ${delta.trend === 'down' ? '📉 Reducción' : delta.trend === 'up' ? '📈 Aumento' : '➡️ Estable'}
+- ${improvement ? '✅ MEJORA DETECTADA: El usuario redujo sus gastos' : '⚠️ Los gastos aumentaron respecto al mes anterior'}
+`;
+    }
+
     // Construir prompt con enfoque premium
     const prompt = `${SYSTEM_PERSONA}
 
@@ -83,6 +112,8 @@ ${categoryDetails}
 COMERCIO MÁS FRECUENTE:
 - **${topMerchant?.[0] || 'N/A'}**: ${topMerchant?.[1].count || 0} transacciones, **${(topMerchant?.[1].total || 0).toLocaleString('es-CO')} COP** acumulados
 
+${historicalContext}
+
 TODAS LAS TRANSACCIONES:
 ${transactions.map(t => 
   `- **${t.description}**: ${t.amount.toLocaleString('es-CO')} COP`
@@ -97,12 +128,15 @@ INSTRUCCIONES CRÍTICAS:
 - Menciona los comercios por nombre (ej: **Rappi**, **Starbucks**, **Uber**)
 - Cuantifica el gasto total en esa categoría: "Has destinado **$X COP** a [categoría específica]"
 - Calcula la frecuencia: "Esto representa X transacciones en el período analizado"
+${comparisonData && comparisonData.improvement ? '- **IMPORTANTE**: Reconoce la mejora respecto al mes anterior. Felicita al usuario por reducir gastos.' : ''}
+${comparisonData && !comparisonData.improvement && comparisonData.delta.trend === 'up' ? '- **IMPORTANTE**: Señala que los gastos aumentaron respecto al mes anterior. Identifica qué categoría causó el incremento.' : ''}
 
 **Párrafo 2 - Acción Concreta de Optimización (3-4 líneas):**
 - Propón UNA acción específica y medible (ej: "Reducir domicilios de **$50,000** a **$25,000** mensuales")
 - Calcula el ahorro ANUAL proyectado
 - Presenta el ahorro como oportunidad de inversión o ahorro: "Este capital liberado (**$X COP** anuales) podría destinarse a [fondo de emergencia/inversión/ahorro programado]"
 - Termina con el impacto: "Optimizar este gasto hormiga representa **$X COP** anuales de flujo de caja recuperado"
+${comparisonData && comparisonData.improvement ? '- **IMPORTANTE**: Motiva al usuario a mantener la racha de mejora. Menciona que va por buen camino.' : ''}
 
 **REGLAS DE TONO:**
 1. Profesional y analítico, NO sarcástico ni agresivo
@@ -112,6 +146,7 @@ INSTRUCCIONES CRÍTICAS:
 5. USA MARKDOWN: **negritas** para TODAS las cifras en COP y nombres de comercios
 6. Enfoque en datos duros y oportunidades, no en drama o culpa
 7. Menciona el ahorro anual como oportunidad de inversión o ahorro programado
+${comparisonData ? '8. **CONTEXTO HISTÓRICO**: Usa la comparación mensual para dar perspectiva. Si mejoró, felicita. Si empeoró, identifica la causa sin juzgar.' : ''}
 
 GENERA LA NARRATIVA EN MARKDOWN:`;
 

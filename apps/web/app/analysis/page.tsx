@@ -7,27 +7,29 @@ import { CsvUploader } from '../../components/CsvUploader';
 import { QuickAddInput } from '../../components/QuickAddInput';
 import { SubscriptionCard } from '../../components/SubscriptionCard';
 import { WeekdayChart } from '../../components/WeekdayChart';
+import { ComparisonCard } from '../../components/ComparisonCard';
+import { TrendChart } from '../../components/TrendChart';
+import { CelebrationAnimation } from '../../components/CelebrationAnimation';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { TrendingUp, DollarSign, Calendar, PieChart as PieChartIcon, LogOut, Sparkles, RefreshCw, CreditCard } from 'lucide-react';
+import { TrendingUp, DollarSign, Calendar, PieChart as PieChartIcon, LogOut, Sparkles, RefreshCw, CreditCard, Award, Target } from 'lucide-react';
 
-// Mapa de colores por categoría (sincronizado en todo el dashboard)
+// Mapa de colores por categoría
 const CATEGORY_COLORS: Record<string, string> = {
-  'café/bebidas': '#8B4513',      // Marrón café
-  'comida rápida': '#FF6B6B',     // Rojo coral
-  'comida': '#FFA500',            // Naranja
-  'transporte': '#4ECDC4',        // Turquesa
-  'suscripciones': '#9B59B6',     // Púrpura
-  'entretenimiento': '#F38181',   // Rosa salmón
-  'hogar': '#3498DB',             // Azul
-  'salud': '#2ECC71',             // Verde
-  'educación': '#E74C3C',         // Rojo
-  'servicios': '#F39C12',         // Amarillo dorado
-  'misceláneos': '#95A5A6'        // Gris neutro
+  'café/bebidas': '#8B4513',
+  'comida rápida': '#FF6B6B',
+  'comida': '#FFA500',
+  'transporte': '#4ECDC4',
+  'suscripciones': '#9B59B6',
+  'entretenimiento': '#F38181',
+  'hogar': '#3498DB',
+  'salud': '#2ECC71',
+  'educación': '#E74C3C',
+  'servicios': '#F39C12',
+  'misceláneos': '#95A5A6'
 };
 
-// Función helper para obtener color con fallback
 const getCategoryColor = (category?: string): string => {
-  if (!category) return '#95A5A6'; // Gris neutro por defecto
+  if (!category) return '#95A5A6';
   return CATEGORY_COLORS[category.toLowerCase()] || '#95A5A6';
 };
 
@@ -60,8 +62,13 @@ export default function AnalysisPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [isLoadingSubscriptions, setIsLoadingSubscriptions] = useState(false);
+  const [comparison, setComparison] = useState<any>(null);
+  const [progress, setProgress] = useState<any>(null);
+  const [isLoadingComparison, setIsLoadingComparison] = useState(false);
+  const [isLoadingProgress, setIsLoadingProgress] = useState(false);
+  const [selectedPeriod, setSelectedPeriod] = useState<number>(6);
+  const [microExpensesOnly, setMicroExpensesOnly] = useState<boolean>(false);
 
-  // Verificar autenticación y cargar transacciones
   useEffect(() => {
     const storedToken = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
@@ -76,24 +83,25 @@ export default function AnalysisPage() {
       setUser(JSON.parse(storedUser));
     }
 
-    // Cargar transacciones desde la BD
     loadTransactions(storedToken);
-    
-    // Cargar suscripciones
     loadSubscriptions(storedToken);
+    loadComparison(storedToken);
+    loadProgress(storedToken);
   }, [router]);
+
+  useEffect(() => {
+    if (token) {
+      loadProgress(token);
+    }
+  }, [selectedPeriod, microExpensesOnly]);
 
   const loadTransactions = async (authToken: string) => {
     setIsLoadingTransactions(true);
     try {
       const response = await fetch('http://localhost:4000/api/transactions', {
-        headers: {
-          'Authorization': `Bearer ${authToken}`
-        }
+        headers: { 'Authorization': `Bearer ${authToken}` }
       });
-
       const data = await response.json();
-
       if (!response.ok) {
         if (response.status === 401) {
           localStorage.removeItem('token');
@@ -101,14 +109,11 @@ export default function AnalysisPage() {
           router.push('/login');
           return;
         }
-        console.error('Error al cargar transacciones:', data.error);
         setTransactions([]);
         return;
       }
-
       setTransactions(data.data.transactions || []);
     } catch (err) {
-      console.error('Error:', err);
       setTransactions([]);
     } finally {
       setIsLoadingTransactions(false);
@@ -119,13 +124,9 @@ export default function AnalysisPage() {
     setIsLoadingSubscriptions(true);
     try {
       const response = await fetch('http://localhost:4000/api/subscriptions', {
-        headers: {
-          'Authorization': `Bearer ${authToken}`
-        }
+        headers: { 'Authorization': `Bearer ${authToken}` }
       });
-
       const data = await response.json();
-
       if (!response.ok) {
         if (response.status === 401) {
           localStorage.removeItem('token');
@@ -133,30 +134,76 @@ export default function AnalysisPage() {
           router.push('/login');
           return;
         }
-        console.error('Error al cargar suscripciones:', data.error);
         setSubscriptions([]);
         return;
       }
-
       setSubscriptions(data.data.subscriptions || []);
     } catch (err) {
-      console.error('Error:', err);
       setSubscriptions([]);
     } finally {
       setIsLoadingSubscriptions(false);
     }
   };
 
+  const loadComparison = async (authToken: string) => {
+    setIsLoadingComparison(true);
+    try {
+      const response = await fetch('http://localhost:4000/api/stats/comparison', {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          router.push('/login');
+          return;
+        }
+        setComparison(null);
+        return;
+      }
+      setComparison(data.data.comparison);
+    } catch (err) {
+      setComparison(null);
+    } finally {
+      setIsLoadingComparison(false);
+    }
+  };
+
+  const loadProgress = async (authToken: string) => {
+    setIsLoadingProgress(true);
+    try {
+      const response = await fetch(
+        `http://localhost:4000/api/stats/progress?months=${selectedPeriod}&microExpensesOnly=${microExpensesOnly}`,
+        { headers: { 'Authorization': `Bearer ${authToken}` } }
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          router.push('/login');
+          return;
+        }
+        setProgress(null);
+        return;
+      }
+      setProgress(data.data.progress);
+    } catch (err) {
+      setProgress(null);
+    } finally {
+      setIsLoadingProgress(false);
+    }
+  };
+
   const handleGenerateNarrative = async () => {
     if (transactions.length === 0) {
-      setError('No hay transacciones para analizar. Importa o agrega transacciones primero.');
+      setError('No hay transacciones para analizar.');
       return;
     }
-
     setIsLoading(true);
     setError('');
     setNarrative('');
-
     try {
       const response = await fetch('http://localhost:4000/api/analysis/narrative', {
         method: 'POST',
@@ -173,9 +220,7 @@ export default function AnalysisPage() {
           }))
         })
       });
-
       const data = await response.json();
-
       if (!response.ok) {
         if (response.status === 401) {
           localStorage.removeItem('token');
@@ -186,11 +231,8 @@ export default function AnalysisPage() {
         setError(data.error?.message || 'Error al generar narrativa');
         return;
       }
-
       setNarrative(data.data.narrative);
-
     } catch (err) {
-      console.error('Error:', err);
       setError('Error de conexión con el servidor');
     } finally {
       setIsLoading(false);
@@ -227,7 +269,6 @@ export default function AnalysisPage() {
     color: getCategoryColor(name)
   })).sort((a, b) => b.value - a.value);
 
-  // Análisis temporal: agrupar por fecha y sumar correctamente
   const timelineData = transactions
     .reduce((acc, t) => {
       const date = t.date;
@@ -239,25 +280,22 @@ export default function AnalysisPage() {
       }
       return acc;
     }, [] as { date: string; amount: number }[])
-    .sort((a, b) => a.date.localeCompare(b.date)) // Ordenar cronológicamente
+    .sort((a, b) => a.date.localeCompare(b.date))
     .map(item => ({
       ...item,
       dateFormatted: new Date(item.date).toLocaleDateString('es-CO', { month: 'short', day: 'numeric' })
     }));
 
-  // Análisis por día de semana
   const weekdayData = transactions.reduce((acc, t) => {
     const date = new Date(t.date);
-    const dayOfWeek = date.getDay(); // 0 = Domingo, 6 = Sábado
+    const dayOfWeek = date.getDay();
     const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
     const dayName = dayNames[dayOfWeek];
-    
     if (!acc[dayName]) {
       acc[dayName] = { day: dayName, amount: 0, count: 0 };
     }
     acc[dayName].amount += t.amount;
     acc[dayName].count += 1;
-    
     return acc;
   }, {} as Record<string, { day: string; amount: number; count: number }>);
 
@@ -284,7 +322,7 @@ export default function AnalysisPage() {
             <div>
               <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
                 <Sparkles className="w-6 h-6 text-indigo-600" />
-                Dashboard Financiero
+                Centro de Control Financiero
               </h1>
               {user && (
                 <p className="text-sm text-gray-600 mt-1">
@@ -352,269 +390,420 @@ export default function AnalysisPage() {
           </div>
         </div>
 
-        {/* CSV Uploader */}
-        <div className="mb-8">
-          <CsvUploader 
-            token={token} 
-            onUploadSuccess={() => {
-              loadTransactions(token);
-              loadSubscriptions(token); // Recargar suscripciones también
-            }} 
-          />
-        </div>
+        {/* GRID DE 2 COLUMNAS: Panel de Análisis (2/3) + Sidebar de Operaciones (1/3) */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          
+          {/* PANEL DE ANÁLISIS (Izquierda - 2/3) */}
+          <div className="lg:col-span-2 space-y-8">
+            
+            {/* Sección de Comparación Histórica y Progreso (Slice 4) */}
+            {(comparison || progress) && (
+              <div>
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-2">
+                    <Award className="w-6 h-6 text-indigo-600" />
+                    <h2 className="text-2xl font-bold text-gray-900">
+                      Tu Progreso Financiero
+                    </h2>
+                  </div>
 
-        {/* Quick Add con IA */}
-        <div className="mb-8">
-          <QuickAddInput 
-            token={token} 
-            onSuccess={() => {
-              loadTransactions(token);
-              loadSubscriptions(token); // Recargar suscripciones también
-            }} 
-          />
-        </div>
+                  {/* Controles de filtrado */}
+                  <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={microExpensesOnly}
+                        onChange={(e) => setMicroExpensesOnly(e.target.checked)}
+                        className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                      />
+                      <span className="text-sm text-gray-700">Solo Gastos Hormiga</span>
+                    </label>
 
-        {/* Panel de transacciones */}
-        <div className="bg-white rounded-xl shadow-md p-6 mb-8 border border-gray-100">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Tus Transacciones</h2>
-            {isLoadingTransactions && (
-              <div className="flex items-center gap-2 text-sm text-indigo-600">
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>Actualizando...</span>
+                    <select
+                      value={selectedPeriod}
+                      onChange={(e) => setSelectedPeriod(parseInt(e.target.value))}
+                      className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    >
+                      <option value={1}>Último mes</option>
+                      <option value={3}>Últimos 3 meses</option>
+                      <option value={6}>Últimos 6 meses</option>
+                    </select>
+                  </div>
+                </div>
+
+                {comparison && (
+                  <CelebrationAnimation
+                    trigger={comparison.improvement && Math.abs(comparison.delta.percentage) >= 15}
+                    improvement={comparison.improvement}
+                    deltaPercentage={comparison.delta.percentage}
+                  />
+                )}
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                  {comparison && (
+                    <div className="lg:col-span-1">
+                      <ComparisonCard
+                        currentMonth={comparison.currentMonth}
+                        previousMonth={comparison.previousMonth}
+                        delta={comparison.delta}
+                        improvement={comparison.improvement}
+                      />
+                    </div>
+                  )}
+
+                  {progress && progress.monthlyHistory.length > 0 && (
+                    <div className="lg:col-span-2 space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {progress.bestMonth && (
+                          <div className="bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-lg p-4 text-white">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Target className="w-5 h-5" />
+                              <p className="text-sm opacity-90">Mejor Mes</p>
+                            </div>
+                            <p className="text-2xl font-bold">
+                              ${progress.bestMonth.totalAmount.toLocaleString('es-CO')}
+                            </p>
+                            <p className="text-xs opacity-75 mt-1">
+                              {new Date(progress.bestMonth.year, progress.bestMonth.monthNumber - 1).toLocaleDateString('es-CO', { month: 'long' })}
+                            </p>
+                          </div>
+                        )}
+
+                        <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg p-4 text-white">
+                          <div className="flex items-center gap-2 mb-2">
+                            <DollarSign className="w-5 h-5" />
+                            <p className="text-sm opacity-90">Promedio</p>
+                          </div>
+                          <p className="text-2xl font-bold">
+                            ${Math.round(progress.averageMonthlySpending).toLocaleString('es-CO')}
+                          </p>
+                          <p className="text-xs opacity-75 mt-1">por mes</p>
+                        </div>
+
+                        <div className="bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl shadow-lg p-4 text-white">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Award className="w-5 h-5" />
+                            <p className="text-sm opacity-90">Racha</p>
+                          </div>
+                          <p className="text-2xl font-bold">
+                            {progress.improvementStreak}
+                          </p>
+                          <p className="text-xs opacity-75 mt-1">
+                            {progress.improvementStreak === 1 ? 'mes mejorando' : 'meses mejorando'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <TrendChart data={progress.monthlyHistory} microExpensesOnly={microExpensesOnly} />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Sección de Suscripciones */}
+            {subscriptions.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                      <CreditCard className="w-6 h-6 text-indigo-600" />
+                      Suscripciones Activas
+                    </h2>
+                    <p className="text-sm text-gray-600 mt-1">
+                      {isLoadingSubscriptions ? (
+                        <span className="flex items-center gap-2">
+                          <RefreshCw className="w-3 h-3 animate-spin" />
+                          Detectando...
+                        </span>
+                      ) : (
+                        `${subscriptions.length} ${subscriptions.length === 1 ? 'suscripción' : 'suscripciones'} detectadas`
+                      )}
+                    </p>
+                  </div>
+                  {!isLoadingSubscriptions && (
+                    <button
+                      onClick={() => loadSubscriptions(token)}
+                      className="flex items-center gap-2 text-sm text-gray-600 hover:text-indigo-600 transition-colors"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl shadow-lg p-6 text-white">
+                    <p className="text-sm opacity-90 mb-1">Total Mensual</p>
+                    <p className="text-3xl font-bold">
+                      ${subscriptions.reduce((sum, sub) => sum + sub.monthlyEstimate, 0).toLocaleString('es-CO')}
+                    </p>
+                    <p className="text-xs opacity-75 mt-2">COP por mes</p>
+                  </div>
+
+                  <div className="bg-gradient-to-r from-pink-500 to-rose-600 rounded-xl shadow-lg p-6 text-white">
+                    <p className="text-sm opacity-90 mb-1">Proyección Anual</p>
+                    <p className="text-3xl font-bold">
+                      ${subscriptions.reduce((sum, sub) => sum + sub.annualEstimate, 0).toLocaleString('es-CO')}
+                    </p>
+                    <p className="text-xs opacity-75 mt-2">COP por año</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {subscriptions.map((subscription, index) => (
+                    <SubscriptionCard
+                      key={`${subscription.serviceName}-${index}`}
+                      serviceName={subscription.serviceName}
+                      amount={subscription.amount}
+                      frequency={subscription.frequency}
+                      monthlyEstimate={subscription.monthlyEstimate}
+                      annualEstimate={subscription.annualEstimate}
+                      lastCharge={subscription.lastCharge}
+                      index={index}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Gráficos de Distribución */}
+            {transactions.length > 0 && (
+              <div className="space-y-6">
+                <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                  <PieChartIcon className="w-6 h-6 text-indigo-600" />
+                  Análisis de Distribución
+                </h2>
+
+                {categoryData.length > 0 && (
+                  <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                      Gastos por Categoría
+                    </h3>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={categoryData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                        <XAxis 
+                          dataKey="name" 
+                          tick={{ fontSize: 12 }}
+                          angle={-45}
+                          textAnchor="end"
+                          height={80}
+                        />
+                        <YAxis tick={{ fontSize: 12 }} />
+                        <Tooltip 
+                          formatter={(value: any) => `${Number(value || 0).toLocaleString('es-CO')} COP`}
+                          contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
+                        />
+                        <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                          {categoryData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+
+                {timelineData.length > 0 && (
+                  <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                      Evolución Temporal
+                    </h3>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <LineChart data={timelineData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                        <XAxis 
+                          dataKey="dateFormatted" 
+                          tick={{ fontSize: 12 }}
+                        />
+                        <YAxis tick={{ fontSize: 12 }} />
+                        <Tooltip 
+                          formatter={(value: any) => `${Number(value || 0).toLocaleString('es-CO')} COP`}
+                          contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="amount" 
+                          stroke="#6366f1" 
+                          strokeWidth={3}
+                          dot={{ fill: '#6366f1', r: 4 }}
+                          activeDot={{ r: 6 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+
+                {categoryData.length > 0 && (
+                  <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                      Distribución de Gastos
+                    </h3>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <PieChart>
+                        <Pie
+                          data={categoryData}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ name, percent }: any) => `${name}: ${((percent || 0) * 100).toFixed(0)}%`}
+                          outerRadius={100}
+                          fill="#8884d8"
+                          dataKey="value"
+                        >
+                          {categoryData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip 
+                          formatter={(value: any) => `${Number(value || 0).toLocaleString('es-CO')} COP`}
+                          contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+
+                <WeekdayChart data={weekdayChartData} />
               </div>
             )}
           </div>
 
-          {isLoadingTransactions ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-              <span className="ml-3 text-gray-600">Cargando transacciones...</span>
-            </div>
-          ) : transactions.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-gray-600">No tienes transacciones aún.</p>
-              <p className="text-sm text-gray-500 mt-2">Importa un CSV o agrega gastos manualmente.</p>
-            </div>
-          ) : (
-            <div className="bg-gray-50 p-4 rounded-lg max-h-60 overflow-y-auto border border-gray-200">
-              <ul className="space-y-2 text-sm">
-                {transactions.map((t, i) => (
-                  <li key={t._id || i} className="flex justify-between items-center py-2 border-b border-gray-200 last:border-0">
-                    <div className="flex items-center gap-3">
-                      <div 
-                        className="w-3 h-3 rounded-full flex-shrink-0" 
-                        style={{ backgroundColor: getCategoryColor(t.category) }}
-                        title={t.category || 'Sin categoría'}
-                      />
-                      <div className="flex flex-col">
-                        <span className="text-gray-700">{t.description}</span>
-                        <span className="text-xs text-gray-500">{t.category || 'misceláneos'}</span>
-                      </div>
-                    </div>
-                    <span className="font-medium text-gray-900">${t.amount.toLocaleString('es-CO')}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-
-        {/* Botón de generación */}
-        <div className="mb-8">
-          <button
-            onClick={handleGenerateNarrative}
-            disabled={isLoading || transactions.length === 0}
-            className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-4 rounded-xl font-medium hover:from-indigo-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
-          >
-            <Sparkles className="w-5 h-5" />
-            {isLoading ? 'Analizando con IA...' : 'Generar Insight con IA'}
-          </button>
-        </div>
-
-        {/* Sección de Suscripciones */}
-        {subscriptions.length > 0 && (
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                  <CreditCard className="w-6 h-6 text-indigo-600" />
-                  Suscripciones y Gastos Recurrentes
-                </h2>
-                <p className="text-sm text-gray-600 mt-1">
-                  {isLoadingSubscriptions ? (
-                    <span className="flex items-center gap-2">
-                      <RefreshCw className="w-3 h-3 animate-spin" />
-                      Detectando suscripciones...
-                    </span>
-                  ) : (
-                    `Detectamos ${subscriptions.length} ${subscriptions.length === 1 ? 'suscripción' : 'suscripciones'} activas`
-                  )}
-                </p>
-              </div>
-              {!isLoadingSubscriptions && (
-                <button
-                  onClick={() => loadSubscriptions(token)}
-                  className="flex items-center gap-2 text-sm text-gray-600 hover:text-indigo-600 transition-colors"
-                  title="Recargar suscripciones"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-
-            {/* Resumen de suscripciones */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl shadow-lg p-6 text-white">
-                <p className="text-sm opacity-90 mb-1">Total Mensual en Suscripciones</p>
-                <p className="text-3xl font-bold">
-                  ${subscriptions.reduce((sum, sub) => sum + sub.monthlyEstimate, 0).toLocaleString('es-CO')}
-                </p>
-                <p className="text-xs opacity-75 mt-2">COP por mes</p>
-              </div>
-
-              <div className="bg-gradient-to-r from-pink-500 to-rose-600 rounded-xl shadow-lg p-6 text-white">
-                <p className="text-sm opacity-90 mb-1">Proyección Anual</p>
-                <p className="text-3xl font-bold">
-                  ${subscriptions.reduce((sum, sub) => sum + sub.annualEstimate, 0).toLocaleString('es-CO')}
-                </p>
-                <p className="text-xs opacity-75 mt-2">COP por año</p>
-              </div>
-            </div>
-
-            {/* Grid de tarjetas de suscripciones */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {subscriptions.map((subscription, index) => (
-                <SubscriptionCard
-                  key={`${subscription.serviceName}-${index}`}
-                  serviceName={subscription.serviceName}
-                  amount={subscription.amount}
-                  frequency={subscription.frequency}
-                  monthlyEstimate={subscription.monthlyEstimate}
-                  annualEstimate={subscription.annualEstimate}
-                  lastCharge={subscription.lastCharge}
-                  index={index}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Layout de 2 columnas: Insight + Gráficos */}
-        {transactions.length > 0 && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Columna izquierda: Insight de IA */}
-            <div className="lg:col-span-1">
-              <InsightCard 
-                narrative={narrative}
-                isLoading={isLoading}
-                error={error}
+          {/* SIDEBAR DE OPERACIONES (Derecha - 1/3) */}
+          <div className="lg:col-span-1 space-y-6">
+            
+            {/* Quick Add Input */}
+            <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                Agregar Transacción Rápida
+              </h3>
+              <QuickAddInput 
+                token={token} 
+                onSuccess={() => {
+                  loadTransactions(token);
+                  loadSubscriptions(token);
+                  loadComparison(token);
+                  loadProgress(token);
+                }} 
               />
             </div>
 
-            {/* Columna derecha: Gráficos */}
-            <div className="lg:col-span-1 space-y-6">
-              {/* Gráfico de barras por categoría */}
-              {categoryData.length > 0 && (
-                <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                    <PieChartIcon className="w-5 h-5 text-indigo-600" />
-                    Gastos por Categoría
-                  </h3>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={categoryData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis 
-                        dataKey="name" 
-                        tick={{ fontSize: 12 }}
-                        angle={-45}
-                        textAnchor="end"
-                        height={80}
-                      />
-                      <YAxis tick={{ fontSize: 12 }} />
-                      <Tooltip 
-                        formatter={(value: any) => `$${Number(value || 0).toLocaleString('es-CO')} COP`}
-                        contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
-                      />
-                      <Bar dataKey="value" radius={[8, 8, 0, 0]}>
-                        {categoryData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-
-              {/* Gráfico de línea temporal */}
-              {timelineData.length > 0 && (
-                <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-indigo-600" />
-                    Evolución Temporal
-                  </h3>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={timelineData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis 
-                        dataKey="dateFormatted" 
-                        tick={{ fontSize: 12 }}
-                      />
-                      <YAxis tick={{ fontSize: 12 }} />
-                      <Tooltip 
-                        formatter={(value: any) => `$${Number(value || 0).toLocaleString('es-CO')} COP`}
-                        contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="amount" 
-                        stroke="#6366f1" 
-                        strokeWidth={3}
-                        dot={{ fill: '#6366f1', r: 4 }}
-                        activeDot={{ r: 6 }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-
-              {/* Gráfico de pie (distribución) */}
-              {categoryData.length > 0 && (
-                <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                    <PieChartIcon className="w-5 h-5 text-indigo-600" />
-                    Distribución de Gastos
-                  </h3>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={categoryData}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ name, percent }: any) => `${name}: ${((percent || 0) * 100).toFixed(0)}%`}
-                        outerRadius={100}
-                        fill="#8884d8"
-                        dataKey="value"
-                      >
-                        {categoryData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip 
-                        formatter={(value: any) => `$${Number(value || 0).toLocaleString('es-CO')} COP`}
-                        contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-
-              {/* Gráfico de gastos por día de semana */}
-              <WeekdayChart data={weekdayChartData} />
+            {/* CSV Uploader */}
+            <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                Importar desde CSV
+              </h3>
+              <CsvUploader 
+                token={token} 
+                onUploadSuccess={() => {
+                  loadTransactions(token);
+                  loadSubscriptions(token);
+                  loadComparison(token);
+                  loadProgress(token);
+                }} 
+              />
             </div>
+
+            {/* Lista de Transacciones */}
+            <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
+              <div className="p-6 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Transacciones Recientes
+                </h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  {transactions.length} {transactions.length === 1 ? 'transacción' : 'transacciones'}
+                </p>
+              </div>
+              <div className="max-h-[500px] overflow-y-auto">
+                {isLoadingTransactions ? (
+                  <div className="p-6 text-center">
+                    <RefreshCw className="w-6 h-6 animate-spin text-indigo-600 mx-auto mb-2" />
+                    <p className="text-sm text-gray-600">Cargando transacciones...</p>
+                  </div>
+                ) : transactions.length === 0 ? (
+                  <div className="p-6 text-center">
+                    <p className="text-sm text-gray-600">No hay transacciones aún</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Agrega una transacción o importa un CSV
+                    </p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-gray-100">
+                    {transactions.slice(0, 50).map((transaction, index) => (
+                      <div 
+                        key={transaction._id || index} 
+                        className="p-4 hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {transaction.description}
+                            </p>
+                            {transaction.category && (
+                              <span 
+                                className="inline-block mt-1 px-2 py-0.5 text-xs rounded-full"
+                                style={{
+                                  backgroundColor: `${getCategoryColor(transaction.category)}20`,
+                                  color: getCategoryColor(transaction.category)
+                                }}
+                              >
+                                {transaction.category}
+                              </span>
+                            )}
+                            <p className="text-xs text-gray-500 mt-1">
+                              {new Date(transaction.date).toLocaleDateString('es-CO', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric'
+                              })}
+                            </p>
+                          </div>
+                          <div className="ml-4 flex-shrink-0">
+                            <p className="text-sm font-semibold text-gray-900">
+                              ${transaction.amount.toLocaleString('es-CO')}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Botón Generar Insight */}
+            <button
+              onClick={handleGenerateNarrative}
+              disabled={isLoading || transactions.length === 0}
+              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 px-6 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {isLoading ? (
+                <>
+                  <RefreshCw className="w-5 h-5 animate-spin" />
+                  Generando insight...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-5 h-5" />
+                  Generar Insight con IA
+                </>
+              )}
+            </button>
+
+            {/* Error Message */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                <p className="text-sm text-red-800">{error}</p>
+              </div>
+            )}
+
+            {/* Insight Card */}
+            {narrative && (
+              <InsightCard narrative={narrative} />
+            )}
           </div>
-        )}
+
+        </div>
       </div>
     </div>
   );

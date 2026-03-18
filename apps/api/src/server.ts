@@ -13,6 +13,7 @@ import authRoutes from './routes/authRoutes';
 import analysisRoutes from './routes/analysisRoutes';
 import transactionRoutes from './routes/transactionRoutes';
 import subscriptionRoutes from './routes/subscriptionRoutes';
+import statsRoutes from './routes/statsRoutes';
 
 const app: Application = express();
 const PORT = process.env.PORT || 4000;
@@ -45,6 +46,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/analysis', analysisRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
+app.use('/api/stats', statsRoutes);
 
 // Ruta 404
 app.use((req: Request, res: Response) => {

@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { generateNarrative } from '../services/aiService';
+import { getMonthlyComparison } from '../services/statsService';
 
 /**
  * POST /api/analysis/narrative
@@ -9,6 +10,7 @@ import { generateNarrative } from '../services/aiService';
 export async function createNarrative(req: Request, res: Response): Promise<void> {
   try {
     const { transactions } = req.body;
+    const userId = req.userId;
 
     // Validar que se enviaron transacciones
     if (!transactions || !Array.isArray(transactions)) {
@@ -51,9 +53,23 @@ export async function createNarrative(req: Request, res: Response): Promise<void
       return;
     }
 
-    // Generar narrativa con IA
+    // Obtener comparación mensual si el usuario está autenticado
+    let comparisonData = undefined;
+    if (userId) {
+      try {
+        const comparison = await getMonthlyComparison(userId);
+        if (comparison) {
+          comparisonData = comparison;
+        }
+      } catch (err) {
+        // Si falla la comparación, continuar sin ella
+        console.error('Error al obtener comparación para narrativa:', err);
+      }
+    }
+
+    // Generar narrativa con IA (con contexto histórico si está disponible)
     const startTime = Date.now();
-    const narrative = await generateNarrative(transactions);
+    const narrative = await generateNarrative(transactions, comparisonData);
     const processingTime = Date.now() - startTime;
 
     // Respuesta exitosa
@@ -65,7 +81,8 @@ export async function createNarrative(req: Request, res: Response): Promise<void
           transactionCount: transactions.length,
           processingTimeMs: processingTime,
           generatedAt: new Date().toISOString(),
-          model: 'gemini-1.5-flash'
+          model: 'gemini-2.5-flash',
+          hasHistoricalContext: !!comparisonData
         }
       }
     });
