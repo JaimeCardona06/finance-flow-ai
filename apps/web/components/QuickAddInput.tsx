@@ -16,7 +16,7 @@ export function QuickAddInput({ onSuccess, token }: QuickAddInputProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!text.trim()) {
       return;
     }
@@ -52,7 +52,7 @@ export function QuickAddInput({ onSuccess, token }: QuickAddInputProps) {
       // Éxito
       setSuccess(data.data.message || `${data.data.count} transacciones agregadas`);
       setText('');
-      
+
       // Recargar transacciones después de 1 segundo
       setTimeout(() => {
         onSuccess();
@@ -68,35 +68,26 @@ export function QuickAddInput({ onSuccess, token }: QuickAddInputProps) {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
-      <div className="flex items-center gap-2 mb-4">
-        <Sparkles className="w-5 h-5 text-indigo-600" />
-        <h3 className="text-lg font-semibold text-gray-900">
-          Agregar Gastos con IA
-        </h3>
-      </div>
-
+    <div className="w-full bg-white rounded-xl shadow-md p-6 border border-gray-100">
       <form onSubmit={handleSubmit}>
         <div className="relative">
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="¿Qué gastaste hoy? Ej: 15k en almuerzo, 50 lucas de gasolina y ayer 200 en arriendo"
-            className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
-            rows={3}
+            placeholder="¿Qué gastaste hoy? Ej: 15k en almuerzo, 50 lucas de gasolina..."
+            /* Aquí están los cambios clave: min-h, rounded-2xl y padding */
+            className="w-full px-4 py-4 pr-14 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none min-h-[140px] text-gray-700 shadow-sm transition-all"
             disabled={isLoading}
           />
+
           <button
             type="submit"
             disabled={isLoading || !text.trim()}
-            className="absolute bottom-3 right-3 bg-indigo-600 text-white px-3 py-2 rounded-lg hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-            title={isLoading ? 'Analizando con IA...' : 'Enviar'}
+            className="absolute bottom-4 right-4 bg-indigo-600 text-white p-3 rounded-xl hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-indigo-200 flex items-center justify-center"
+            title={isLoading ? 'Analizando...' : 'Enviar'}
           >
             {isLoading ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                <span className="text-xs whitespace-nowrap">Analizando...</span>
-              </>
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
             ) : (
               <Send className="w-5 h-5" />
             )}

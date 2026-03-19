@@ -142,7 +142,7 @@ async function refineServiceNameWithAI(originalNames: string[]): Promise<string>
     
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ 
-      model: 'models/gemini-2.0-flash-exp',
+      model: 'models/gemini-2.5-flash',
       generationConfig: {
         temperature: 0.1,
         maxOutputTokens: 50
@@ -162,10 +162,27 @@ Ejemplo: Si ves "Netflix Colombia", "Netflix.com", "NETFLIX" → responde "Netfl
     
     return refinedName;
     
-  } catch (error) {
-    console.error('Error al refinar nombre con IA:', error);
-    // Fallback: retornar el nombre más corto (suele ser el más limpio)
-    return originalNames.sort((a, b) => a.length - b.length)[0];
+  } catch (error: any) {
+    // Si es error de cuota (429), usar fallback silenciosamente
+    if (error?.status === 429) {
+      console.warn('⚠️ Cuota de Gemini excedida, usando fallback para nombres');
+    } else {
+      console.error('Error al refinar nombre con IA:', error);
+    }
+    
+    // Fallback mejorado: retornar el nombre más común de la lista
+    const nameCounts = originalNames.reduce((acc, name) => {
+      acc[name] = (acc[name] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    // Si hay empate, usar el más corto
+    const sortedByFrequency = Object.entries(nameCounts).sort((a, b) => {
+      if (b[1] !== a[1]) return b[1] - a[1]; // Por frecuencia
+      return a[0].length - b[0].length; // Por longitud si hay empate
+    });
+    
+    return sortedByFrequency[0][0];
   }
 }
 
@@ -199,39 +216,44 @@ export async function detectSubscriptions(userId: string): Promise<DetectedSubsc
     const subscriptionCandidates = filterSubscriptionCandidates(candidates);
     // console.log(`✅ [Subscriptions] ${subscriptionCandidates.length} suscripciones detectadas`);
     
-    // 3. Refinar nombres con IA (en paralelo)
-    const detectedSubscriptions: DetectedSubscription[] = await Promise.all(
-      subscriptionCandidates.map(async (candidate) => {
-        const refinedName = await refineServiceNameWithAI(candidate.originalNames);
-        
-        // Calcular frecuencia (días entre cargos)
-        const sortedDates = candidate.dates.sort();
-        const daysBetweenCharges = [];
-        for (let i = 1; i < sortedDates.length; i++) {
-          const diff = Math.abs(
-            new Date(sortedDates[i]).getTime() - new Date(sortedDates[i - 1]).getTime()
-          );
-          daysBetweenCharges.push(Math.round(diff / (1000 * 60 * 60 * 24)));
-        }
-        const avgFrequency = daysBetweenCharges.length > 0
-          ? Math.round(daysBetweenCharges.reduce((a, b) => a + b, 0) / daysBetweenCharges.length)
-          : 30;
-        
-        // Estimar costo mensual y anual
-        const monthlyEstimate = avgFrequency <= 35 ? candidate.amount : Math.round((candidate.amount * 30) / avgFrequency);
-        const annualEstimate = monthlyEstimate * 12;
-        
-        return {
-          serviceName: refinedName,
-          amount: candidate.amount,
-          frequency: avgFrequency,
-          monthlyEstimate,
-          annualEstimate,
-          lastCharge: sortedDates[sortedDates.length - 1],
-          transactions: candidate.transactionIds
-        };
-      })
-    );
+    // 3. Refinar nombres con IA (secuencialmente con delay para respetar rate limits)
+    const detectedSubscriptions: DetectedSubscription[] = [];
+    
+    for (const candidate of subscriptionCandidates) {
+      const refinedName = await refineServiceNameWithAI(candidate.originalNames);
+      
+      // Calcular frecuencia (días entre cargos)
+      const sortedDates = candidate.dates.sort();
+      const daysBetweenCharges = [];
+      for (let i = 1; i < sortedDates.length; i++) {
+        const diff = Math.abs(
+          new Date(sortedDates[i]).getTime() - new Date(sortedDates[i - 1]).getTime()
+        );
+        daysBetweenCharges.push(Math.round(diff / (1000 * 60 * 60 * 24)));
+      }
+      const avgFrequency = daysBetweenCharges.length > 0
+        ? Math.round(daysBetweenCharges.reduce((a, b) => a + b, 0) / daysBetweenCharges.length)
+        : 30;
+      
+      // Estimar costo mensual y anual
+      const monthlyEstimate = avgFrequency <= 35 ? candidate.amount : Math.round((candidate.amount * 30) / avgFrequency);
+      const annualEstimate = monthlyEstimate * 12;
+      
+      detectedSubscriptions.push({
+        serviceName: refinedName,
+        amount: candidate.amount,
+        frequency: avgFrequency,
+        monthlyEstimate,
+        annualEstimate,
+        lastCharge: sortedDates[sortedDates.length - 1],
+        transactions: candidate.transactionIds
+      });
+      
+      // Delay de 1 segundo entre llamadas para respetar rate limits (5 req/min)
+      if (subscriptionCandidates.indexOf(candidate) < subscriptionCandidates.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
     
     // Ordenar por costo mensual (mayor a menor)
     return detectedSubscriptions.sort((a, b) => b.monthlyEstimate - a.monthlyEstimate);

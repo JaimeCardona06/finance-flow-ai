@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import confetti from 'canvas-confetti';
 
 interface CelebrationAnimationProps {
@@ -10,8 +10,18 @@ interface CelebrationAnimationProps {
 }
 
 export function CelebrationAnimation({ trigger, improvement, deltaPercentage }: CelebrationAnimationProps) {
+  const [hasCelebrated, setHasCelebrated] = useState(false);
+
   useEffect(() => {
-    if (trigger && improvement && Math.abs(deltaPercentage) >= 15) {
+    // Verificar si ya celebramos en esta sesión
+    const celebrationKey = `celebrated_${Math.abs(deltaPercentage).toFixed(1)}`;
+    const alreadyCelebrated = sessionStorage.getItem(celebrationKey);
+
+    if (trigger && improvement && Math.abs(deltaPercentage) >= 15 && !alreadyCelebrated && !hasCelebrated) {
+      // Marcar como celebrado
+      setHasCelebrated(true);
+      sessionStorage.setItem(celebrationKey, 'true');
+
       // Configuración de confetti
       const duration = 3000;
       const animationEnd = Date.now() + duration;
@@ -47,7 +57,7 @@ export function CelebrationAnimation({ trigger, improvement, deltaPercentage }: 
 
       return () => clearInterval(interval);
     }
-  }, [trigger, improvement, deltaPercentage]);
+  }, [trigger, improvement, deltaPercentage, hasCelebrated]);
 
   return null; // Este componente no renderiza nada visible
 }

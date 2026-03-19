@@ -67,9 +67,9 @@ export async function createNarrative(req: Request, res: Response): Promise<void
       }
     }
 
-    // Generar narrativa con IA (con contexto histórico si está disponible)
+    // Generar narrativa con IA (con contexto histórico y planes activos si están disponibles)
     const startTime = Date.now();
-    const narrative = await generateNarrative(transactions, comparisonData);
+    const narrative = await generateNarrative(transactions, userId, comparisonData);
     const processingTime = Date.now() - startTime;
 
     // Respuesta exitosa

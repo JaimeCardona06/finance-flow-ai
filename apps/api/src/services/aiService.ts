@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { savingsPlanService } from './savingsPlanService';
 
 /**
  * Persona del estratega financiero colombiano premium
@@ -20,11 +21,13 @@ interface TransactionSummary {
  * Implementación basada en la documentación oficial de Google AI
  * 
  * @param transactions - Array de transacciones del usuario
+ * @param userId - ID del usuario para obtener sus planes activos
  * @param comparisonData - Datos de comparación mes actual vs anterior (opcional)
  * @returns Narrativa generada por la IA (máx. 3 párrafos)
  */
 export async function generateNarrative(
   transactions: TransactionSummary[],
+  userId: string,
   comparisonData?: {
     currentMonth: { totalAmount: number; month: string };
     previousMonth: { totalAmount: number; month: string };
@@ -34,7 +37,7 @@ export async function generateNarrative(
 ): Promise<string> {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
-    
+
     if (!apiKey) {
       throw new Error('GEMINI_API_KEY no está configurada');
     }
@@ -96,6 +99,58 @@ CONTEXTO HISTÓRICO (COMPARACIÓN MENSUAL):
 `;
     }
 
+    // Obtener planes activos del usuario (Slice 5 - Fase 3)
+    let plansContext = '';
+    try {
+      const activePlans = await savingsPlanService.getPlansForAI(userId);
+
+      if (activePlans.length > 0) {
+        plansContext = `
+🎯 METAS DE AHORRO ACTIVAS (CRÍTICO - DEBES MENCIONARLAS):
+El usuario tiene ${activePlans.length} ${activePlans.length === 1 ? 'meta activa' : 'metas activas'}:
+
+${activePlans.map(plan => {
+          const statusEmoji = plan.statusColor === 'green' ? '🟢' : plan.statusColor === 'yellow' ? '🟡' : '🔴';
+          const statusText = plan.statusColor === 'green'
+            ? 'DENTRO DEL LÍMITE'
+            : plan.statusColor === 'yellow'
+              ? '⚠️ ALERTA - CERCA DEL LÍMITE'
+              : '🚨 LÍMITE SUPERADO';
+
+          return `${statusEmoji} **${plan.category.toUpperCase()}**: ${plan.progressPercentage}% (${statusText})
+   - Gastado: **${plan.currentAmount.toLocaleString('es-CO')} COP** de **${plan.targetAmount.toLocaleString('es-CO')} COP**
+   - Días restantes: ${plan.daysRemaining}
+   - Estado: ${plan.statusColor === 'green' ? '✅ Bien encaminado' : plan.statusColor === 'yellow' ? '⚠️ Requiere atención inmediata' : '❌ Meta fallida este período'}`;
+        }).join('\n\n')}
+
+**INSTRUCCIONES OBLIGATORIAS SOBRE METAS:**
+${activePlans.some(p => p.statusColor === 'red') ? `
+🚨 **METAS EN ROJO (>= 100%):**
+${activePlans.filter(p => p.statusColor === 'red').map(p =>
+          `- **${p.category}**: Superaste el límite en **${(p.currentAmount - p.targetAmount).toLocaleString('es-CO')} COP**. Reconoce el exceso sin juzgar. Motiva a ajustar el límite o reducir gastos para el próximo período. Usa un tono de "aprendizaje" no de "fracaso".`
+        ).join('\n')}
+` : ''}
+${activePlans.some(p => p.statusColor === 'yellow') ? `
+🟡 **METAS EN AMARILLO (80-99%) - ALERTA PROACTIVA:**
+${activePlans.filter(p => p.statusColor === 'yellow').map(p =>
+          `- **${p.category}**: Estás al ${p.progressPercentage}% del límite (**${p.currentAmount.toLocaleString('es-CO')} COP** de **${p.targetAmount.toLocaleString('es-CO')} COP**). Solo quedan **${(p.targetAmount - p.currentAmount).toLocaleString('es-CO')} COP** de margen y ${p.daysRemaining} días. GENERA UN "PLAN DE EMERGENCIA" ESPECÍFICO: sugiere acciones concretas para no superar el límite (ej: "Evita domicilios esta semana", "Usa transporte público los próximos días").`
+        ).join('\n')}
+` : ''}
+${activePlans.some(p => p.statusColor === 'green') ? `
+🟢 **METAS EN VERDE (< 80%):**
+${activePlans.filter(p => p.statusColor === 'green').map(p =>
+          `- **${p.category}**: Vas excelente al ${p.progressPercentage}% del límite. Felicita al usuario por mantener la disciplina. Menciona cuánto margen le queda (**${(p.targetAmount - p.currentAmount).toLocaleString('es-CO')} COP**) y motívalo a mantener el ritmo.`
+        ).join('\n')}
+` : ''}
+
+**REGLA DE ORO:** Si hay metas activas, DEBES mencionarlas en tu narrativa. No las ignores. Son el contexto más importante para el usuario.
+`;
+      }
+    } catch (error) {
+      console.error('Error al obtener planes activos para IA:', error);
+      // Continuar sin contexto de planes si falla
+    }
+
     // Construir prompt con enfoque premium
     const prompt = `${SYSTEM_PERSONA}
 
@@ -114,10 +169,12 @@ COMERCIO MÁS FRECUENTE:
 
 ${historicalContext}
 
+${plansContext}
+
 TODAS LAS TRANSACCIONES:
-${transactions.map(t => 
-  `- **${t.description}**: ${t.amount.toLocaleString('es-CO')} COP`
-).join('\n')}
+${transactions.map(t =>
+      `- **${t.description}**: ${t.amount.toLocaleString('es-CO')} COP`
+    ).join('\n')}
 
 INSTRUCCIONES CRÍTICAS:
 
@@ -130,6 +187,7 @@ INSTRUCCIONES CRÍTICAS:
 - Calcula la frecuencia: "Esto representa X transacciones en el período analizado"
 ${comparisonData && comparisonData.improvement ? '- **IMPORTANTE**: Reconoce la mejora respecto al mes anterior. Felicita al usuario por reducir gastos.' : ''}
 ${comparisonData && !comparisonData.improvement && comparisonData.delta.trend === 'up' ? '- **IMPORTANTE**: Señala que los gastos aumentaron respecto al mes anterior. Identifica qué categoría causó el incremento.' : ''}
+${plansContext ? '- **CRÍTICO**: Si hay metas activas, menciónalas aquí. Si alguna está en amarillo o rojo, haz una alerta proactiva.' : ''}
 
 **Párrafo 2 - Acción Concreta de Optimización (3-4 líneas):**
 - Propón UNA acción específica y medible (ej: "Reducir domicilios de **$50,000** a **$25,000** mensuales")
@@ -137,6 +195,7 @@ ${comparisonData && !comparisonData.improvement && comparisonData.delta.trend ==
 - Presenta el ahorro como oportunidad de inversión o ahorro: "Este capital liberado (**$X COP** anuales) podría destinarse a [fondo de emergencia/inversión/ahorro programado]"
 - Termina con el impacto: "Optimizar este gasto hormiga representa **$X COP** anuales de flujo de caja recuperado"
 ${comparisonData && comparisonData.improvement ? '- **IMPORTANTE**: Motiva al usuario a mantener la racha de mejora. Menciona que va por buen camino.' : ''}
+${plansContext ? '- **CRÍTICO**: Si hay metas en amarillo, propón un "Plan de Emergencia" para no superarlas. Si hay metas en rojo, motiva sin juzgar y sugiere ajustar el límite para el próximo período. Si hay metas en verde, felicita por la disciplina.' : ''}
 
 **REGLAS DE TONO:**
 1. Profesional y analítico, NO sarcástico ni agresivo
@@ -147,14 +206,15 @@ ${comparisonData && comparisonData.improvement ? '- **IMPORTANTE**: Motiva al us
 6. Enfoque en datos duros y oportunidades, no en drama o culpa
 7. Menciona el ahorro anual como oportunidad de inversión o ahorro programado
 ${comparisonData ? '8. **CONTEXTO HISTÓRICO**: Usa la comparación mensual para dar perspectiva. Si mejoró, felicita. Si empeoró, identifica la causa sin juzgar.' : ''}
+${plansContext ? '9. **METAS DE AHORRO**: Si el usuario tiene metas activas, DEBES mencionarlas. Son su prioridad. Usa emojis: 🟢 (bien), 🟡 (cuidado), 🔴 (superado).' : ''}
 
 GENERA LA NARRATIVA EN MARKDOWN:`;
 
     // Configurar Gemini según documentación oficial
     const genAI = new GoogleGenerativeAI(apiKey);
-    
+
     // Usar modelo con prefijo 'models/' según documentación oficial
-    const model = genAI.getGenerativeModel({ 
+    const model = genAI.getGenerativeModel({
       model: "models/gemini-2.5-flash",
       generationConfig: {
         temperature: 0.7,      // Creatividad moderada para narrativas
@@ -164,7 +224,7 @@ GENERA LA NARRATIVA EN MARKDOWN:`;
       }
     });
 
-    
+
     // Generar contenido
     const result = await model.generateContent(prompt);
     const response = result.response;
@@ -174,9 +234,9 @@ GENERA LA NARRATIVA EN MARKDOWN:`;
 
   } catch (error) {
     console.error('Error al generar narrativa con Gemini:', error);
-    
+
     const totalAmount = transactions.reduce((sum, t) => sum + t.amount, 0);
-    
+
     // Fallback: narrativa básica sin IA
     return `⚠️ **Análisis básico (sin IA)**
 
@@ -199,7 +259,7 @@ ${transactions.slice(0, 5).map(t => `- **${t.description}**: ${t.amount.toLocale
 export async function extractTransactionsFromText(text: string): Promise<any[]> {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
-    
+
     if (!apiKey) {
       throw new Error('GEMINI_API_KEY no está configurada');
     }
@@ -244,7 +304,7 @@ GENERA EL ARRAY JSON:`;
 
     // Configurar Gemini para respuesta JSON
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ 
+    const model = genAI.getGenerativeModel({
       model: "models/gemini-2.5-flash",
       generationConfig: {
         temperature: 0.3, // Más determinístico para extracción
@@ -274,9 +334,9 @@ GENERA EL ARRAY JSON:`;
     }
 
     // Validar estructura de cada transacción
-    const validTransactions = transactions.filter(t => 
-      t.description && 
-      typeof t.amount === 'number' && 
+    const validTransactions = transactions.filter(t =>
+      t.description &&
+      typeof t.amount === 'number' &&
       t.amount > 0 &&
       t.date
     );

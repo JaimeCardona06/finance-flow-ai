@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { Transaction } from '../models/Transaction';
 import { extractTransactionsFromText } from '../services/aiService';
+import { savingsPlanService } from '../services/savingsPlanService';
 
 /**
  * GET /api/transactions
@@ -63,6 +64,18 @@ export const createTransaction = async (req: Request, res: Response) => {
       merchant: merchant || description.split(' ')[0],
       isMicroExpense: Number(amount) <= 50000 // Gastos hormiga <= 50k COP
     });
+
+    // Actualizar plan de ahorro si existe para esta categoría
+    try {
+      await savingsPlanService.updatePlanAmount(
+        userId,
+        transaction.category,
+        transaction.amount
+      );
+    } catch (planError) {
+      console.error('Error al actualizar plan de ahorro:', planError);
+      // No fallar la creación de transacción si falla la actualización del plan
+    }
 
     res.status(201).json({
       success: true,
@@ -127,6 +140,20 @@ export const createBulkTransactions = async (req: Request, res: Response) => {
 
     // Insertar en bulk
     const created = await Transaction.insertMany(validTransactions);
+
+    // Actualizar planes de ahorro para cada transacción
+    try {
+      for (const transaction of created) {
+        await savingsPlanService.updatePlanAmount(
+          userId,
+          transaction.category,
+          transaction.amount
+        );
+      }
+    } catch (planError) {
+      console.error('Error al actualizar planes de ahorro:', planError);
+      // No fallar la importación si falla la actualización de planes
+    }
 
     res.status(201).json({
       success: true,
@@ -248,6 +275,20 @@ export const quickAddTransactions = async (req: Request, res: Response) => {
 
     // Insertar en bulk
     const created = await Transaction.insertMany(transactionsToInsert);
+
+    // Actualizar planes de ahorro para cada transacción
+    try {
+      for (const transaction of created) {
+        await savingsPlanService.updatePlanAmount(
+          userId,
+          transaction.category,
+          transaction.amount
+        );
+      }
+    } catch (planError) {
+      console.error('Error al actualizar planes de ahorro:', planError);
+      // No fallar el quick-add si falla la actualización de planes
+    }
 
     res.status(201).json({
       success: true,
