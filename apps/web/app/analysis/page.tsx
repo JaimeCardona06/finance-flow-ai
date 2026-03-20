@@ -2,16 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { InsightCard } from '../../components/InsightCard';
-import { CsvUploader } from '../../components/CsvUploader';
-import { QuickAddInput } from '../../components/QuickAddInput';
-import { WeekdayChart } from '../../components/WeekdayChart';
-import { ActivePlansCard } from '../../components/ActivePlansCard';
+import { DashboardHeader } from '../../components/dashboard/DashboardHeader';
 import { SubscriptionsSection } from '../../components/dashboard/SubscriptionsSection';
 import { FinancialSummaryCards } from '../../components/dashboard/FinancialSummaryCards';
 import { FinancialProgressSection } from '../../components/dashboard/FinancialProgressSection';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { PieChart as PieChartIcon, LogOut, Sparkles, RefreshCw } from 'lucide-react';
+import { DistributionChartsSection } from '../../components/dashboard/DistributionChartsSection';
+import { AIInsightSection } from '../../components/dashboard/AIInsightSection';
+import { QuickAddSection } from '../../components/dashboard/QuickAddSection';
+import { DashboardSidebar } from '../../components/dashboard/DashboardSidebar';
 
 // Mapa de colores por categoría
 const CATEGORY_COLORS: Record<string, string> = {
@@ -308,30 +306,7 @@ export default function AnalysisPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                <Sparkles className="w-6 h-6 text-indigo-600" />
-                Centro de Control Financiero
-              </h1>
-              {user && (
-                <p className="text-sm text-gray-600 mt-1">
-                  Bienvenido, {user.name}
-                </p>
-              )}
-            </div>
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              <LogOut className="w-4 h-4" />
-              Cerrar sesión
-            </button>
-          </div>
-        </div>
-      </div>
+      <DashboardHeader userName={user?.name} onLogout={handleLogout} />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Stats Cards */}
@@ -358,21 +333,15 @@ export default function AnalysisPage() {
           <div className="lg:col-span-2 space-y-8">
 
             {/* Quick Add Input - Movido aquí para mejor UX */}
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2 mb-6">
-                <Sparkles className="w-6 h-6 text-indigo-600" />
-                Agregar Gastos con IA
-              </h2>
-              <QuickAddInput 
-                token={token} 
-                onSuccess={() => {
-                  loadTransactions(token);
-                  loadSubscriptions(token);
-                  loadComparison(token);
-                  loadProgress(token);
-                }} 
-              />
-            </div>
+            <QuickAddSection
+              token={token}
+              onSuccess={() => {
+                loadTransactions(token);
+                loadSubscriptions(token);
+                loadComparison(token);
+                loadProgress(token);
+              }}
+            />
 
             {/* Sección de Suscripciones */}
             <SubscriptionsSection
@@ -382,234 +351,36 @@ export default function AnalysisPage() {
             />
 
             {/* Botón Generar Insight con IA - Movido aquí para mejor legibilidad */}
-            <div className="space-y-6">
-              <button
-                onClick={handleGenerateNarrative}
-                disabled={isLoading || transactions.length === 0}
-                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 px-6 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {isLoading ? (
-                  <>
-                    <RefreshCw className="w-5 h-5 animate-spin" />
-                    Generando insight...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-5 h-5" />
-                    Generar Insight con IA
-                  </>
-                )}
-              </button>
-
-              {/* Error Message */}
-              {error && (
-                <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-                  <p className="text-sm text-red-800">{error}</p>
-                </div>
-              )}
-
-              {/* Insight Card */}
-              {narrative && (
-                <InsightCard narrative={narrative} />
-              )}
-            </div>
+            <AIInsightSection
+              narrative={narrative}
+              isLoading={isLoading}
+              error={error}
+              hasTransactions={transactions.length > 0}
+              onGenerate={handleGenerateNarrative}
+            />
 
             {/* Gráficos de Distribución */}
-            {transactions.length > 0 && (
-              <div className="space-y-6">
-                <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                  <PieChartIcon className="w-6 h-6 text-indigo-600" />
-                  Análisis de Distribución
-                </h2>
-
-                {categoryData.length > 0 && (
-                  <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                      Gastos por Categoría
-                    </h3>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <BarChart data={categoryData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                        <XAxis 
-                          dataKey="name" 
-                          tick={{ fontSize: 12 }}
-                          angle={-45}
-                          textAnchor="end"
-                          height={80}
-                        />
-                        <YAxis tick={{ fontSize: 12 }} />
-                        <Tooltip 
-                          formatter={(value: any) => `${Number(value || 0).toLocaleString('es-CO')} COP`}
-                          contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
-                        />
-                        <Bar dataKey="value" radius={[8, 8, 0, 0]}>
-                          {categoryData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
-
-                {timelineData.length > 0 && (
-                  <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                      Evolución Temporal
-                    </h3>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <LineChart data={timelineData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                        <XAxis 
-                          dataKey="dateFormatted" 
-                          tick={{ fontSize: 12 }}
-                        />
-                        <YAxis tick={{ fontSize: 12 }} />
-                        <Tooltip 
-                          formatter={(value: any) => `${Number(value || 0).toLocaleString('es-CO')} COP`}
-                          contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
-                        />
-                        <Line 
-                          type="monotone" 
-                          dataKey="amount" 
-                          stroke="#6366f1" 
-                          strokeWidth={3}
-                          dot={{ fill: '#6366f1', r: 4 }}
-                          activeDot={{ r: 6 }}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
-
-                {categoryData.length > 0 && (
-                  <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                      Distribución de Gastos
-                    </h3>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <PieChart>
-                        <Pie
-                          data={categoryData}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          label={({ name, percent }: any) => `${name}: ${((percent || 0) * 100).toFixed(0)}%`}
-                          outerRadius={100}
-                          fill="#8884d8"
-                          dataKey="value"
-                        >
-                          {categoryData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip 
-                          formatter={(value: any) => `${Number(value || 0).toLocaleString('es-CO')} COP`}
-                          contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
-
-                <WeekdayChart data={weekdayChartData} />
-              </div>
-            )}
+            <DistributionChartsSection
+              categoryData={categoryData}
+              timelineData={timelineData}
+              weekdayChartData={weekdayChartData}
+              hasTransactions={transactions.length > 0}
+            />
           </div>
 
           {/* SIDEBAR DE OPERACIONES (Derecha - 1/3) */}
-          <div className="lg:col-span-1 space-y-6">
-            
-            {/* Metas de Ahorro (Slice 5) */}
-            <ActivePlansCard 
-              token={token}
-              reloadTrigger={transactions.length} // Trigger para recargar cuando cambian las transacciones
-              onPlanCreated={() => {
-                loadTransactions(token);
-                loadSubscriptions(token);
-                loadComparison(token);
-                loadProgress(token);
-              }}
-            />
-
-            {/* CSV Uploader */}
-            <CsvUploader 
-              token={token} 
-              onUploadSuccess={() => {
-                loadTransactions(token);
-                loadSubscriptions(token);
-                loadComparison(token);
-                loadProgress(token);
-              }} 
-            />
-
-            {/* Lista de Transacciones */}
-            <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
-              <div className="p-6 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Transacciones Recientes
-                </h3>
-                <p className="text-sm text-gray-600 mt-1">
-                  {transactions.length} {transactions.length === 1 ? 'transacción' : 'transacciones'}
-                </p>
-              </div>
-              <div className="max-h-[500px] overflow-y-auto">
-                {isLoadingTransactions ? (
-                  <div className="p-6 text-center">
-                    <RefreshCw className="w-6 h-6 animate-spin text-indigo-600 mx-auto mb-2" />
-                    <p className="text-sm text-gray-600">Cargando transacciones...</p>
-                  </div>
-                ) : transactions.length === 0 ? (
-                  <div className="p-6 text-center">
-                    <p className="text-sm text-gray-600">No hay transacciones aún</p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Agrega una transacción o importa un CSV
-                    </p>
-                  </div>
-                ) : (
-                  <div className="divide-y divide-gray-100">
-                    {transactions.slice(0, 50).map((transaction, index) => (
-                      <div 
-                        key={transaction._id || index} 
-                        className="p-4 hover:bg-gray-50 transition-colors"
-                      >
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900 truncate">
-                              {transaction.description}
-                            </p>
-                            {transaction.category && (
-                              <span 
-                                className="inline-block mt-1 px-2 py-0.5 text-xs rounded-full"
-                                style={{
-                                  backgroundColor: `${getCategoryColor(transaction.category)}20`,
-                                  color: getCategoryColor(transaction.category)
-                                }}
-                              >
-                                {transaction.category}
-                              </span>
-                            )}
-                            <p className="text-xs text-gray-500 mt-1">
-                              {new Date(transaction.date).toLocaleDateString('es-CO', {
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric'
-                              })}
-                            </p>
-                          </div>
-                          <div className="ml-4 flex-shrink-0">
-                            <p className="text-sm font-semibold text-gray-900">
-                              ${transaction.amount.toLocaleString('es-CO')}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+          <DashboardSidebar
+            token={token}
+            transactions={transactions}
+            isLoadingTransactions={isLoadingTransactions}
+            getCategoryColor={getCategoryColor}
+            onDataChange={() => {
+              loadTransactions(token);
+              loadSubscriptions(token);
+              loadComparison(token);
+              loadProgress(token);
+            }}
+          />
 
         </div>
       </div>
