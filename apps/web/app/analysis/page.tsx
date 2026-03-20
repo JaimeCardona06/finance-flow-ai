@@ -5,14 +5,13 @@ import { useRouter } from 'next/navigation';
 import { InsightCard } from '../../components/InsightCard';
 import { CsvUploader } from '../../components/CsvUploader';
 import { QuickAddInput } from '../../components/QuickAddInput';
-import { SubscriptionCard } from '../../components/SubscriptionCard';
 import { WeekdayChart } from '../../components/WeekdayChart';
-import { ComparisonCard } from '../../components/ComparisonCard';
-import { TrendChart } from '../../components/TrendChart';
-import { CelebrationAnimation } from '../../components/CelebrationAnimation';
 import { ActivePlansCard } from '../../components/ActivePlansCard';
+import { SubscriptionsSection } from '../../components/dashboard/SubscriptionsSection';
+import { FinancialSummaryCards } from '../../components/dashboard/FinancialSummaryCards';
+import { FinancialProgressSection } from '../../components/dashboard/FinancialProgressSection';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { TrendingUp, DollarSign, Calendar, PieChart as PieChartIcon, LogOut, Sparkles, RefreshCw, CreditCard, Award, Target } from 'lucide-react';
+import { PieChart as PieChartIcon, LogOut, Sparkles, RefreshCw } from 'lucide-react';
 
 // Mapa de colores por categoría
 const CATEGORY_COLORS: Record<string, string> = {
@@ -65,8 +64,6 @@ export default function AnalysisPage() {
   const [isLoadingSubscriptions, setIsLoadingSubscriptions] = useState(false);
   const [comparison, setComparison] = useState<any>(null);
   const [progress, setProgress] = useState<any>(null);
-  const [isLoadingComparison, setIsLoadingComparison] = useState(false);
-  const [isLoadingProgress, setIsLoadingProgress] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<number>(6);
   const [microExpensesOnly, setMicroExpensesOnly] = useState<boolean>(false);
 
@@ -147,7 +144,6 @@ export default function AnalysisPage() {
   };
 
   const loadComparison = async (authToken: string) => {
-    setIsLoadingComparison(true);
     try {
       const response = await fetch('http://localhost:4000/api/stats/comparison', {
         headers: { 'Authorization': `Bearer ${authToken}` }
@@ -166,13 +162,10 @@ export default function AnalysisPage() {
       setComparison(data.data.comparison);
     } catch (err) {
       setComparison(null);
-    } finally {
-      setIsLoadingComparison(false);
     }
   };
 
   const loadProgress = async (authToken: string) => {
-    setIsLoadingProgress(true);
     try {
       const response = await fetch(
         `http://localhost:4000/api/stats/progress?months=${selectedPeriod}&microExpensesOnly=${microExpensesOnly}`,
@@ -192,8 +185,6 @@ export default function AnalysisPage() {
       setProgress(data.data.progress);
     } catch (err) {
       setProgress(null);
-    } finally {
-      setIsLoadingProgress(false);
     }
   };
 
@@ -344,157 +335,21 @@ export default function AnalysisPage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Total Gastado</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  ${totalAmount.toLocaleString('es-CO')}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">COP</p>
-              </div>
-              <div className="bg-indigo-100 p-3 rounded-lg">
-                <DollarSign className="w-6 h-6 text-indigo-600" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Transacciones</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {transactions.length}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">en el período</p>
-              </div>
-              <div className="bg-purple-100 p-3 rounded-lg">
-                <TrendingUp className="w-6 h-6 text-purple-600" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Ticket Promedio</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  ${avgAmount.toLocaleString('es-CO')}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">COP</p>
-              </div>
-              <div className="bg-green-100 p-3 rounded-lg">
-                <Calendar className="w-6 h-6 text-green-600" />
-              </div>
-            </div>
-          </div>
-        </div>
+        <FinancialSummaryCards
+          totalAmount={totalAmount}
+          transactionCount={transactions.length}
+          avgAmount={avgAmount}
+        />
 
         {/* HERO CHART: Progreso Financiero - Ancho Completo */}
-        {(comparison || progress) && (
-          <div className="w-full mb-8">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-2">
-                <Award className="w-6 h-6 text-indigo-600" />
-                <h2 className="text-2xl font-bold text-gray-900">
-                  Tu Progreso Financiero
-                </h2>
-              </div>
-
-              {/* Controles de filtrado */}
-              <div className="flex items-center gap-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={microExpensesOnly}
-                    onChange={(e) => setMicroExpensesOnly(e.target.checked)}
-                    className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                  />
-                  <span className="text-sm text-gray-700">Solo Gastos Hormiga</span>
-                </label>
-
-                <select
-                  value={selectedPeriod}
-                  onChange={(e) => setSelectedPeriod(parseInt(e.target.value))}
-                  className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                >
-                  <option value={1}>Último mes</option>
-                  <option value={3}>Últimos 3 meses</option>
-                  <option value={6}>Últimos 6 meses</option>
-                </select>
-              </div>
-            </div>
-
-            {comparison && (
-              <CelebrationAnimation
-                trigger={comparison.improvement && Math.abs(comparison.delta.percentage) >= 15}
-                improvement={comparison.improvement}
-                deltaPercentage={comparison.delta.percentage}
-              />
-            )}
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {comparison && (
-                <div className="lg:col-span-1">
-                  <ComparisonCard
-                    currentMonth={comparison.currentMonth}
-                    previousMonth={comparison.previousMonth}
-                    delta={comparison.delta}
-                    improvement={comparison.improvement}
-                  />
-                </div>
-              )}
-
-              {progress && progress.monthlyHistory.length > 0 && (
-                <div className="lg:col-span-2 space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {progress.bestMonth && (
-                      <div className="bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-lg p-4 text-white">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Target className="w-5 h-5" />
-                          <p className="text-sm opacity-90">Mejor Mes</p>
-                        </div>
-                        <p className="text-2xl font-bold">
-                          ${progress.bestMonth.totalAmount.toLocaleString('es-CO')}
-                        </p>
-                        <p className="text-xs opacity-75 mt-1">
-                          {new Date(progress.bestMonth.year, progress.bestMonth.monthNumber - 1).toLocaleDateString('es-CO', { month: 'long' })}
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg p-4 text-white">
-                      <div className="flex items-center gap-2 mb-2">
-                        <DollarSign className="w-5 h-5" />
-                        <p className="text-sm opacity-90">Promedio</p>
-                      </div>
-                      <p className="text-2xl font-bold">
-                        ${Math.round(progress.averageMonthlySpending).toLocaleString('es-CO')}
-                      </p>
-                      <p className="text-xs opacity-75 mt-1">por mes</p>
-                    </div>
-
-                    <div className="bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl shadow-lg p-4 text-white">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Award className="w-5 h-5" />
-                        <p className="text-sm opacity-90">Racha</p>
-                      </div>
-                      <p className="text-2xl font-bold">
-                        {progress.improvementStreak}
-                      </p>
-                      <p className="text-xs opacity-75 mt-1">
-                        {progress.improvementStreak === 1 ? 'mes mejorando' : 'meses mejorando'}
-                      </p>
-                    </div>
-                  </div>
-
-                  <TrendChart data={progress.monthlyHistory} microExpensesOnly={microExpensesOnly} />
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+        <FinancialProgressSection
+          comparison={comparison}
+          progress={progress}
+          selectedPeriod={selectedPeriod}
+          microExpensesOnly={microExpensesOnly}
+          onPeriodChange={setSelectedPeriod}
+          onMicroExpensesToggle={setMicroExpensesOnly}
+        />
 
         {/* GRID DE 2 COLUMNAS: Panel de Análisis (2/3) + Sidebar de Operaciones (1/3) */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -520,69 +375,11 @@ export default function AnalysisPage() {
             </div>
 
             {/* Sección de Suscripciones */}
-            {subscriptions.length > 0 && (
-              <div>
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                      <CreditCard className="w-6 h-6 text-indigo-600" />
-                      Suscripciones Activas
-                    </h2>
-                    <p className="text-sm text-gray-600 mt-1">
-                      {isLoadingSubscriptions ? (
-                        <span className="flex items-center gap-2">
-                          <RefreshCw className="w-3 h-3 animate-spin" />
-                          Detectando...
-                        </span>
-                      ) : (
-                        `${subscriptions.length} ${subscriptions.length === 1 ? 'suscripción' : 'suscripciones'} detectadas`
-                      )}
-                    </p>
-                  </div>
-                  {!isLoadingSubscriptions && (
-                    <button
-                      onClick={() => loadSubscriptions(token)}
-                      className="flex items-center gap-2 text-sm text-gray-600 hover:text-indigo-600 transition-colors"
-                    >
-                      <RefreshCw className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                  <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl shadow-lg p-6 text-white">
-                    <p className="text-sm opacity-90 mb-1">Total Mensual</p>
-                    <p className="text-3xl font-bold">
-                      ${subscriptions.reduce((sum, sub) => sum + sub.monthlyEstimate, 0).toLocaleString('es-CO')}
-                    </p>
-                    <p className="text-xs opacity-75 mt-2">COP por mes</p>
-                  </div>
-
-                  <div className="bg-gradient-to-r from-pink-500 to-rose-600 rounded-xl shadow-lg p-6 text-white">
-                    <p className="text-sm opacity-90 mb-1">Proyección Anual</p>
-                    <p className="text-3xl font-bold">
-                      ${subscriptions.reduce((sum, sub) => sum + sub.annualEstimate, 0).toLocaleString('es-CO')}
-                    </p>
-                    <p className="text-xs opacity-75 mt-2">COP por año</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {subscriptions.map((subscription, index) => (
-                    <SubscriptionCard
-                      key={`${subscription.serviceName}-${index}`}
-                      serviceName={subscription.serviceName}
-                      amount={subscription.amount}
-                      frequency={subscription.frequency}
-                      monthlyEstimate={subscription.monthlyEstimate}
-                      annualEstimate={subscription.annualEstimate}
-                      lastCharge={subscription.lastCharge}
-                      index={index}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
+            <SubscriptionsSection
+              subscriptions={subscriptions}
+              isLoading={isLoadingSubscriptions}
+              onRefresh={() => loadSubscriptions(token)}
+            />
 
             {/* Botón Generar Insight con IA - Movido aquí para mejor legibilidad */}
             <div className="space-y-6">
