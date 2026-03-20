@@ -3,14 +3,7 @@
 import { ActivePlansCard } from '../ActivePlansCard';
 import { CsvUploader } from '../CsvUploader';
 import { TransactionsList } from './TransactionsList';
-
-interface Transaction {
-  _id?: string;
-  description: string;
-  amount: number;
-  date: string;
-  category?: string;
-}
+import type { Transaction } from '../../types/dashboard';
 
 interface DashboardSidebarProps {
   token: string;

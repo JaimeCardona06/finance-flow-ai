@@ -3,24 +3,7 @@
 import { PieChart as PieChartIcon } from 'lucide-react';
 import { WeekdayChart } from '../WeekdayChart';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-
-interface CategoryData {
-  name: string;
-  value: number;
-  color: string;
-}
-
-interface TimelineData {
-  date: string;
-  amount: number;
-  dateFormatted: string;
-}
-
-interface WeekdayData {
-  day: string;
-  amount: number;
-  average: number;
-}
+import type { CategoryData, TimelineData, WeekdayData } from '../../types/dashboard';
 
 interface DistributionChartsSectionProps {
   categoryData: CategoryData[];

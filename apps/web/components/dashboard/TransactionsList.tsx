@@ -1,14 +1,7 @@
 'use client';
 
 import { RefreshCw } from 'lucide-react';
-
-interface Transaction {
-  _id?: string;
-  description: string;
-  amount: number;
-  date: string;
-  category?: string;
-}
+import type { Transaction } from '../../types/dashboard';
 
 interface TransactionsListProps {
   transactions: Transaction[];

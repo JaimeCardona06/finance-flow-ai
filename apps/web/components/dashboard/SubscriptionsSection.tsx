@@ -2,16 +2,7 @@
 
 import { CreditCard, RefreshCw } from 'lucide-react';
 import { SubscriptionCard } from '../SubscriptionCard';
-
-interface Subscription {
-  serviceName: string;
-  amount: number;
-  frequency: number;
-  monthlyEstimate: number;
-  annualEstimate: number;
-  lastCharge: string;
-  transactions: string[];
-}
+import type { Subscription } from '../../types/dashboard';
 
 interface SubscriptionsSectionProps {
   subscriptions: Subscription[];
