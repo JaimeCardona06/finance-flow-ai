@@ -1,5 +1,5 @@
 import { Transaction } from '../models/Transaction';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 
 interface SubscriptionCandidate {
   normalizedName: string;
@@ -129,9 +129,9 @@ function filterSubscriptionCandidates(candidates: SubscriptionCandidate[]): Subs
  */
 async function refineServiceNameWithAI(originalNames: string[]): Promise<string> {
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) {
-      console.warn('⚠️ GEMINI_API_KEY no configurada, usando nombre más común');
+      console.warn('⚠️ OPENROUTER_API_KEY no configurada, usando nombre más común');
       // Fallback: retornar el nombre más común
       const nameCounts = originalNames.reduce((acc, name) => {
         acc[name] = (acc[name] || 0) + 1;
@@ -140,13 +140,9 @@ async function refineServiceNameWithAI(originalNames: string[]): Promise<string>
       return Object.entries(nameCounts).sort((a, b) => b[1] - a[1])[0][0];
     }
     
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ 
-      model: 'models/gemini-2.5-flash',
-      generationConfig: {
-        temperature: 0.1,
-        maxOutputTokens: 50
-      }
+    const openai = new OpenAI({
+      baseURL: "https://openrouter.ai/api/v1",
+      apiKey: apiKey,
     });
     
     const prompt = `Estas son variaciones del nombre de un mismo servicio de suscripción:
@@ -155,8 +151,16 @@ ${originalNames.map((name, i) => `${i + 1}. ${name}`).join('\n')}
 ¿Cuál es el nombre canónico y limpio de este servicio? Responde SOLO con el nombre, sin explicaciones.
 Ejemplo: Si ves "Netflix Colombia", "Netflix.com", "NETFLIX" → responde "Netflix"`;
     
-    const result = await model.generateContent(prompt);
-    const refinedName = result.response.text().trim();
+    const response = await openai.chat.completions.create({
+      model: "google/gemini-2.5-flash",
+      messages: [
+        { role: "user", content: prompt }
+      ],
+      temperature: 0.1,
+      max_tokens: 50,
+    });
+    
+    const refinedName = response.choices[0]?.message?.content?.trim() || originalNames[0];
     
     // console.log(`✨ [IA] Nombres originales: ${originalNames.join(', ')} → Refinado: ${refinedName}`);
     

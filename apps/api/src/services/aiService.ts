@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 import { savingsPlanService } from './savingsPlanService';
 
 /**
@@ -36,10 +36,10 @@ export async function generateNarrative(
   }
 ): Promise<string> {
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.OPENROUTER_API_KEY;
 
     if (!apiKey) {
-      throw new Error('GEMINI_API_KEY no está configurada');
+      throw new Error('OPENROUTER_API_KEY no está configurada');
     }
 
     if (transactions.length === 0) {
@@ -210,26 +210,23 @@ ${plansContext ? '9. **METAS DE AHORRO**: Si el usuario tiene metas activas, DEB
 
 GENERA LA NARRATIVA EN MARKDOWN:`;
 
-    // Configurar Gemini según documentación oficial
-    const genAI = new GoogleGenerativeAI(apiKey);
-
-    // Usar modelo con prefijo 'models/' según documentación oficial
-    const model = genAI.getGenerativeModel({
-      model: "models/gemini-2.5-flash",
-      generationConfig: {
-        temperature: 0.7,      // Creatividad moderada para narrativas
-        topP: 0.95,
-        topK: 40,
-        maxOutputTokens: 8192,
-      }
+    // Configurar OpenAI client para OpenRouter
+    const openai = new OpenAI({
+      baseURL: "https://openrouter.ai/api/v1",
+      apiKey: process.env.OPENROUTER_API_KEY,
     });
 
+    // Generar contenido usando OpenAI SDK
+    const response = await openai.chat.completions.create({
+      model: "google/gemini-2.5-flash",
+      messages: [
+        { role: "user", content: prompt }
+      ],
+      temperature: 0.7,
+      max_tokens: 8192,
+    });
 
-    // Generar contenido
-    const result = await model.generateContent(prompt);
-    const response = result.response;
-    const narrative = response.text();
-
+    const narrative = response.choices[0]?.message?.content || '';
     return narrative.trim();
 
   } catch (error) {
@@ -258,10 +255,10 @@ ${transactions.slice(0, 5).map(t => `- **${t.description}**: ${t.amount.toLocale
  */
 export async function extractTransactionsFromText(text: string): Promise<any[]> {
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.OPENROUTER_API_KEY;
 
     if (!apiKey) {
-      throw new Error('GEMINI_API_KEY no está configurada');
+      throw new Error('OPENROUTER_API_KEY no está configurada');
     }
 
     const today = new Date().toISOString().split('T')[0];
@@ -302,22 +299,23 @@ FORMATO DE RESPUESTA (ejemplo):
 
 GENERA EL ARRAY JSON:`;
 
-    // Configurar Gemini para respuesta JSON
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
-      model: "models/gemini-2.5-flash",
-      generationConfig: {
-        temperature: 0.3, // Más determinístico para extracción
-        topP: 0.95,
-        topK: 40,
-        maxOutputTokens: 8192,
-        responseMimeType: 'application/json'
-      }
+    // Configurar OpenAI client para OpenRouter
+    const openai = new OpenAI({
+      baseURL: "https://openrouter.ai/api/v1",
+      apiKey: process.env.OPENROUTER_API_KEY,
     });
 
-    const result = await model.generateContent(prompt);
-    const response = result.response;
-    let responseText = response.text();
+    const response = await openai.chat.completions.create({
+      model: "google/gemini-2.5-flash",
+      messages: [
+        { role: "user", content: prompt }
+      ],
+      temperature: 0.3,
+      max_tokens: 8192,
+      response_format: { type: "json_object" }
+    });
+
+    let responseText = response.choices[0]?.message?.content || '[]';
 
     // Limpiar respuesta (por si viene con markdown)
     responseText = responseText.trim();
@@ -350,8 +348,8 @@ GENERA EL ARRAY JSON:`;
 }
 
 /**
- * Validar que la API key esté configurada
+ * Validar que la API key de OpenRouter esté configurada
  */
 export function validateGeminiConfig(): boolean {
-  return !!process.env.GEMINI_API_KEY;
+  return !!process.env.OPENROUTER_API_KEY;
 }
