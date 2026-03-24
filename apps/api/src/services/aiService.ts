@@ -306,7 +306,7 @@ GENERA EL ARRAY JSON:`;
     });
 
     const response = await openai.chat.completions.create({
-      model: "google/gemini-2.5-flash",
+      model: "meta-llama/llama-3.1-8b-instruct:free",
       messages: [
         { role: "user", content: prompt }
       ],
