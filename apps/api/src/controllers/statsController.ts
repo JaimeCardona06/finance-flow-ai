@@ -5,30 +5,32 @@ import { getMonthlyComparison, getProgressData, saveMilestone } from '../service
  * GET /api/stats/comparison
  * Comparar mes actual vs mes anterior
  */
-export const getComparison = async (req: Request, res: Response) => {
+export const getComparison = async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.userId;
     
     if (!userId) {
-      return res.status(401).json({
+      res.status(401).json({
         success: false,
         error: {
           code: 'UNAUTHORIZED',
           message: 'Usuario no autenticado'
         }
       });
+      return;
     }
     
     const comparison = await getMonthlyComparison(userId);
     
     if (!comparison) {
-      return res.status(200).json({
+      res.status(200).json({
         success: true,
         data: {
           comparison: null,
           message: 'No hay suficientes datos para comparar'
         }
       });
+      return;
     }
 
     // Guardar milestone si hay mejora >= 15%
@@ -68,18 +70,19 @@ export const getComparison = async (req: Request, res: Response) => {
  * GET /api/stats/progress?months=6&microExpensesOnly=true
  * Obtener progreso histórico con filtros opcionales
  */
-export const getProgress = async (req: Request, res: Response) => {
+export const getProgress = async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.userId;
     
     if (!userId) {
-      return res.status(401).json({
+      res.status(401).json({
         success: false,
         error: {
           code: 'UNAUTHORIZED',
           message: 'Usuario no autenticado'
         }
       });
+      return;
     }
 
     // Parsear query params
@@ -88,13 +91,14 @@ export const getProgress = async (req: Request, res: Response) => {
 
     // Validar months
     if (months < 1 || months > 12) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: {
           code: 'INVALID_PARAMETER',
           message: 'El parámetro months debe estar entre 1 y 12'
         }
       });
+      return;
     }
     
     const progress = await getProgressData(userId, { months, microExpensesOnly });

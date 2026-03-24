@@ -1,6 +1,7 @@
 'use client';
 
 import { LogOut, Sparkles } from 'lucide-react';
+import { ExportButton } from '../ExportButton';
 
 interface DashboardHeaderProps {
   userName?: string;
@@ -23,13 +24,16 @@ export function DashboardHeader({ userName, onLogout }: DashboardHeaderProps) {
               </p>
             )}
           </div>
-          <button
-            onClick={onLogout}
-            className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            <LogOut className="w-4 h-4" />
-            Cerrar sesión
-          </button>
+          <div className="flex items-center gap-3">
+            <ExportButton variant="secondary" />
+            <button
+              onClick={onLogout}
+              className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              Cerrar sesión
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -7,9 +7,14 @@ import { savingsPlanService } from '../services/savingsPlanService';
  * GET /api/transactions
  * Obtener todas las transacciones del usuario autenticado
  */
-export const getTransactions = async (req: Request, res: Response) => {
+export const getTransactions = async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.userId;
+
+    if (!userId) {
+      res.status(401).json({ error: 'Usuario no autenticado' });
+      return;
+    }
 
     const transactions = await Transaction.find({ userId })
       .sort({ date: -1 })
@@ -38,20 +43,27 @@ export const getTransactions = async (req: Request, res: Response) => {
  * POST /api/transactions
  * Crear una nueva transacción
  */
-export const createTransaction = async (req: Request, res: Response) => {
+export const createTransaction = async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.userId;
+
+    if (!userId) {
+      res.status(401).json({ error: 'Usuario no autenticado' });
+      return;
+    }
+
     const { description, amount, date, category, merchant } = req.body;
 
     // Validar campos requeridos
     if (!description || !amount || !date) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: {
           code: 'MISSING_FIELDS',
           message: 'Faltan campos requeridos: description, amount, date'
         }
       });
+      return;
     }
 
     // Crear transacción
@@ -69,7 +81,7 @@ export const createTransaction = async (req: Request, res: Response) => {
     try {
       await savingsPlanService.updatePlanAmount(
         userId,
-        transaction.category,
+        transaction.category || 'misceláneos',
         transaction.amount
       );
     } catch (planError) {
@@ -99,20 +111,26 @@ export const createTransaction = async (req: Request, res: Response) => {
  * POST /api/transactions/bulk
  * Crear múltiples transacciones (para CSV upload)
  */
-export const createBulkTransactions = async (req: Request, res: Response) => {
+export const createBulkTransactions = async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.userId;
+
+    if (!userId) {
+      res.status(401).json({ error: 'Usuario no autenticado' });
+      return;
+    }
     const { transactions } = req.body;
 
     // Validar que sea un array
     if (!Array.isArray(transactions) || transactions.length === 0) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: {
           code: 'INVALID_INPUT',
           message: 'Se requiere un array de transacciones'
         }
       });
+      return;
     }
 
     // Validar y preparar transacciones
@@ -129,13 +147,14 @@ export const createBulkTransactions = async (req: Request, res: Response) => {
       }));
 
     if (validTransactions.length === 0) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: {
           code: 'NO_VALID_TRANSACTIONS',
           message: 'No se encontraron transacciones válidas'
         }
       });
+      return;
     }
 
     // Insertar en bulk
@@ -178,9 +197,15 @@ export const createBulkTransactions = async (req: Request, res: Response) => {
  * DELETE /api/transactions/:id
  * Eliminar una transacción
  */
-export const deleteTransaction = async (req: Request, res: Response) => {
+export const deleteTransaction = async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.userId;
+
+    if (!userId) {
+      res.status(401).json({ error: 'Usuario no autenticado' });
+      return;
+    }
+
     const { id } = req.params;
 
     const transaction = await Transaction.findOneAndDelete({
@@ -189,13 +214,14 @@ export const deleteTransaction = async (req: Request, res: Response) => {
     });
 
     if (!transaction) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: {
           code: 'NOT_FOUND',
           message: 'Transacción no encontrada'
         }
       });
+      return;
     }
 
     res.status(200).json({
@@ -221,20 +247,27 @@ export const deleteTransaction = async (req: Request, res: Response) => {
  * Agregar transacciones usando lenguaje natural (IA)
  * Ejemplo: "15k en almuerzo, 50 lucas de gasolina y ayer 200 en arriendo"
  */
-export const quickAddTransactions = async (req: Request, res: Response) => {
+export const quickAddTransactions = async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.userId;
+
+    if (!userId) {
+      res.status(401).json({ error: 'Usuario no autenticado' });
+      return;
+    }
+
     const { text } = req.body;
 
     // Validar que haya texto
     if (!text || typeof text !== 'string' || text.trim().length === 0) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: {
           code: 'MISSING_TEXT',
           message: 'Se requiere el campo "text" con la descripción de los gastos'
         }
       });
+      return;
     }
 
     // Extraer transacciones usando IA
@@ -243,23 +276,25 @@ export const quickAddTransactions = async (req: Request, res: Response) => {
       extractedTransactions = await extractTransactionsFromText(text);
     } catch (aiError) {
       console.error('Error al extraer transacciones con IA:', aiError);
-      return res.status(500).json({
+      res.status(500).json({
         success: false,
         error: {
           code: 'AI_EXTRACTION_ERROR',
           message: 'No se pudieron extraer transacciones del texto. Intenta ser más específico.'
         }
       });
+      return;
     }
 
     if (extractedTransactions.length === 0) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: {
           code: 'NO_TRANSACTIONS_FOUND',
           message: 'No se encontraron transacciones en el texto. Intenta con un formato como: "15k en almuerzo, 50 lucas de gasolina"'
         }
       });
+      return;
     }
 
     // Preparar transacciones para insertar

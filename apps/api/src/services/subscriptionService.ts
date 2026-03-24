@@ -70,7 +70,7 @@ function groupTransactionsByPattern(transactions: any[]): SubscriptionCandidate[
     // Buscar grupo existente con monto similar (varianza < 1%)
     let foundGroup = false;
     
-    for (const [key, group] of groups.entries()) {
+    for (const [_key, group] of groups.entries()) {
       const amountVariance = Math.abs(group.amount - amount) / group.amount;
       const nameSimilarity = calculateSimilarity(group.normalizedName, normalizedName);
       

@@ -39,3 +39,12 @@ export {
   prioritySchema,
   actionTypeSchema
 } from './types/insight';
+
+// Types de Export
+export {
+  type ExportOptions,
+  type ExportStats,
+  type ExportResponse,
+  type ExportFormat,
+  type ExportRequest
+} from './types/export';

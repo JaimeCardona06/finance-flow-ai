@@ -12,6 +12,11 @@ export async function createNarrative(req: Request, res: Response): Promise<void
     const { transactions } = req.body;
     const userId = req.userId;
 
+    if (!userId) {
+      res.status(401).json({ error: 'Usuario no autenticado' });
+      return;
+    }
+
     // Validar que se enviaron transacciones
     if (!transactions || !Array.isArray(transactions)) {
       res.status(400).json({

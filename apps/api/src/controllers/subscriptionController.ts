@@ -5,18 +5,19 @@ import { detectSubscriptions } from '../services/subscriptionService';
  * GET /api/subscriptions
  * Detectar suscripciones del usuario autenticado
  */
-export const getSubscriptions = async (req: Request, res: Response) => {
+export const getSubscriptions = async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.userId;
     
     if (!userId) {
-      return res.status(401).json({
+      res.status(401).json({
         success: false,
         error: {
           code: 'UNAUTHORIZED',
           message: 'Usuario no autenticado'
         }
       });
+      return;
     }
     
     const subscriptions = await detectSubscriptions(userId);

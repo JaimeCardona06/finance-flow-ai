@@ -6,12 +6,16 @@
     "module": "commonjs",
     "moduleResolution": "node",
     "outDir": "./dist",
-    "rootDir": "./src",
+    "baseUrl": ".",
     "noEmit": false,
+    "composite": false,
+    "declaration": true,
+    "declarationMap": true,
     "paths": {
-      "@financeflow/shared": ["../../packages/shared/src"]
+      "@financeflow/shared": ["../../packages/shared/src/index.ts"],
+      "@financeflow/shared/*": ["../../packages/shared/src/*"]
     }
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }
