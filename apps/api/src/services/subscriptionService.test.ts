@@ -661,8 +661,7 @@ describe('subscriptionService', () => {
       fc.assert(
         fc.asyncProperty(
           fc.integer({ min: 10000, max: 50000 }),
-          fc.integer({ min: 25, max: 35 }), // Frecuencia mensual
-          async (amount, frequency) => {
+          async (amount) => {
             // Arrange
             const mockTransactions = [
               createMockTransaction('1', 'Netflix', amount, '2026-01-15'),
@@ -689,7 +688,7 @@ describe('subscriptionService', () => {
 
             // Assert
             if (result.length > 0) {
-              // Para frecuencia mensual (25-35 días), el estimate mensual debe ser igual al monto
+              // Para frecuencia mensual (~31 días), el estimate mensual debe ser igual al monto
               expect(result[0].monthlyEstimate).toBe(amount);
               expect(result[0].annualEstimate).toBe(amount * 12);
             }
