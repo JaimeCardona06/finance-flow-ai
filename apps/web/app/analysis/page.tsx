@@ -9,6 +9,7 @@ import { SubscriptionsSection } from '../../components/dashboard/SubscriptionsSe
 import { AIInsightSection } from '../../components/dashboard/AIInsightSection';
 import { DistributionChartsSection } from '../../components/dashboard/DistributionChartsSection';
 import { DashboardSidebar } from '../../components/dashboard/DashboardSidebar';
+import { ChatFloatingButton } from '../../components/ChatFloatingButton';
 
 export default function AnalysisPage() {
   const dashboardData = useDashboardData();
@@ -85,6 +86,9 @@ export default function AnalysisPage() {
           />
         </div>
       </div>
+
+      {/* Botón flotante de chat */}
+      <ChatFloatingButton />
     </div>
   );
 }
