@@ -457,7 +457,7 @@ npm run build --workspace=apps/api
 
 ### Metodología de Desarrollo por Slices Verticales
 
-FinanceFlow AI se implementará mediante **5 slices verticales**, donde cada slice entrega valor completo al usuario (frontend + backend + base de datos + testing). Esta metodología permite:
+FinanceFlow AI se implementará mediante **6 slices verticales**, donde cada slice entrega valor completo al usuario (frontend + backend + base de datos + testing). Esta metodología permite:
 
 - Validar hipótesis de producto tempranamente
 - Obtener feedback de usuarios reales en cada iteración
@@ -726,6 +726,155 @@ Cada slice incluye:
 
 ---
 
+### Slice 6: Exportación de Datos
+
+**Objetivo**: Usuario puede exportar sus transacciones a formato Excel para análisis externo, respaldo de datos, y ejercer su derecho de acceso a datos personales (Ley 1581).
+
+**Valor para el usuario**: Tener control total sobre sus datos financieros, poder analizarlos en herramientas externas, y cumplir con el derecho de portabilidad de datos.
+
+**Alcance**:
+
+**Frontend (apps/web)**:
+- Componente `<ExportButton>` con estados de carga y animaciones
+- Mensajes de éxito/error con animaciones de Framer Motion
+- Hook personalizado `useExport` para lógica de exportación
+- Descarga automática del archivo Excel generado
+- Integración en dashboard (accesible desde cualquier vista)
+- Indicador visual durante proceso de exportación
+- Manejo de errores con mensajes claros al usuario
+
+**Backend (apps/api)**:
+- GET /api/export/excel (generar y descargar archivo Excel)
+  - Parámetros opcionales: startDate, endDate (filtrado por rango de fechas)
+  - Autenticación obligatoria con JWT
+  - Validación de usuario autenticado
+  - Generación de archivo Excel con ExcelJS
+  - Headers configurados para descarga automática
+  - Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+  - Content-Disposition con nombre de archivo dinámico
+- GET /api/export/stats (estadísticas de exportación)
+  - Total de transacciones del usuario
+  - Cantidad de gastos hormiga
+  - Monto total acumulado
+  - Fecha de exportación
+- Servicio completo de exportación (`exportService.ts`)
+- Controller dedicado (`exportController.ts`)
+
+**Características del Excel Generado**:
+
+**Estructura del archivo**:
+- Nombre de archivo: `financeflow-transacciones-YYYY-MM-DD.xlsx`
+- Worksheet: "Transacciones"
+- Columnas:
+  1. Fecha (formato dd/mm/yyyy localizado a Colombia)
+  2. Descripción (texto completo de la transacción)
+  3. Monto (COP) (formato de moneda con separador de miles)
+  4. Categoría (categoría detectada o "Sin categoría")
+  5. Merchant (comercio identificado o "N/A")
+  6. Gasto Hormiga (Sí/No)
+
+**Estilos y Formato**:
+- Header con fondo azul (#4F46E5), texto blanco, negrita, centrado
+- Formato de moneda: `$#,##0.00` con separador de miles
+- Alineación de montos a la derecha
+- Resaltado amarillo (#FEF3C7) para filas de gastos hormiga
+- Fila de totales al final con fórmula SUM automática
+- Fondo gris (#E5E7EB) en fila de totales
+- Auto-filtro habilitado en todas las columnas
+- Anchos de columna optimizados para legibilidad
+
+**Metadata del Workbook**:
+- Creator: "FinanceFlow AI"
+- Created: Fecha y hora de generación
+- Tab color: Verde (#00FF00)
+
+**Funcionalidades Avanzadas**:
+- Filtrado por rango de fechas (query params startDate/endDate)
+- Ordenamiento por fecha descendente (más recientes primero)
+- Fórmula de totales dinámica basada en cantidad de transacciones
+- Manejo de transacciones vacías (genera Excel válido sin datos)
+- Validación de formato de fechas en query params
+
+**Base de Datos**:
+- No requiere nuevas colecciones (usa `transactions` existente)
+- Query optimizado con índices en userId y date
+- Uso de `.lean()` para mejor performance (no hydrata documentos Mongoose)
+- Soporte para agregaciones si se necesitan estadísticas adicionales
+
+**Componentes UI**:
+- `<ExportButton>` - Botón principal con variantes (primary/secondary)
+  - Estado de carga con spinner animado
+  - Animación whileHover (scale 1.02)
+  - Animación whileTap (scale 0.98)
+  - Disabled state durante exportación
+- Mensajes de feedback:
+  - Mensaje de éxito con animación fade-in
+  - Mensaje de error con detalles del problema
+  - Auto-dismiss después de 3 segundos
+
+**Shared Types (packages/shared)**:
+- `ExportOptions` interface (userId, startDate, endDate, format)
+- `ExportStats` interface (totalTransactions, microExpenses, totalAmount, exportDate)
+
+**Testing**:
+- Tests unitarios completos (`exportService.test.ts`)
+- Property-based tests con fast-check:
+  - Property 1: Excel buffer debe ser válido para cualquier conjunto de transacciones
+  - Property 2: Totales deben ser correctos (fórmula SUM)
+  - Property 3: Filtrado por fecha debe ser consistente
+- Tests de casos edge:
+  - Transacciones vacías
+  - Rangos de fecha inválidos
+  - Usuario sin transacciones
+- Cobertura: 100% en exportService
+- Validación de estructura del workbook con ExcelJS
+
+**Cumplimiento Ley 1581**:
+- **Derecho de Acceso**: Usuario puede consultar todos sus datos almacenados
+- **Derecho de Portabilidad**: Datos exportados en formato estándar (Excel)
+- **Transparencia**: Usuario ve exactamente qué datos tiene el sistema
+- **Control de Acceso**: Solo el usuario autenticado puede exportar sus propios datos
+- **Auditoría**: Endpoint de stats permite tracking de exportaciones
+- **Seguridad**: Validación de JWT en cada request
+- **No compartir con terceros**: Datos solo accesibles por el titular
+
+**Dependencias Técnicas**:
+- `exceljs` (^4.3.0): Librería para generación de archivos Excel
+  - Soporte completo para XLSX
+  - API fluida para estilos y formato
+  - Generación de buffers en memoria (no archivos temporales)
+  - Soporte para fórmulas, auto-filtros, y formato condicional
+
+**Performance**:
+- Generación de Excel: < 2 segundos para 1000 transacciones
+- Tamaño de archivo: ~50 KB para 500 transacciones
+- Uso de memoria: Buffer en memoria (no archivos temporales)
+- Streaming no necesario para MVP (volúmenes manejables)
+
+**Criterios de Éxito**:
+- ✅ Usuario puede exportar todas sus transacciones en < 3 segundos
+- ✅ Excel generado es válido y se abre correctamente en Excel/Google Sheets
+- ✅ Formato de moneda COP es correcto con separador de miles
+- ✅ Gastos hormiga están resaltados visualmente
+- ✅ Fila de totales calcula correctamente la suma
+- ✅ Auto-filtro permite filtrar por categoría, merchant, etc.
+- ✅ Filtrado por rango de fechas funciona correctamente
+- ✅ Mensajes de error son claros y accionables
+- ✅ Animaciones de carga mejoran la experiencia de usuario
+- ✅ Solo el usuario autenticado puede exportar sus datos
+
+**Duración Estimada**: 4 días
+
+**Archivos Implementados**:
+- `apps/web/components/ExportButton.tsx`
+- `apps/web/hooks/useExport.ts`
+- `apps/api/src/services/exportService.ts`
+- `apps/api/src/services/exportService.test.ts`
+- `apps/api/src/controllers/exportController.ts`
+- `packages/shared/src/types/export.ts`
+
+---
+
 ## Resumen de Slices
 
 | Slice | Objetivo Principal | Duración | Acumulado |
@@ -735,8 +884,9 @@ Cada slice incluye:
 | 3 | Suscripciones y Análisis Temporal | 6 días | 16 días |
 | 4 | Comparación Histórica y Progreso | 6 días | 22 días |
 | 5 | Plan de Choque | 7 días | 29 días |
+| 6 | Exportación de Datos | 4 días | 33 días |
 
-**Total: ~6 semanas de desarrollo** (considerando 5 días laborales por semana)
+**Total: ~7 semanas de desarrollo** (considerando 5 días laborales por semana)
 
 ### Dependencias entre Slices
 
@@ -750,7 +900,11 @@ Slice 3 (Suscripciones) ← Depende de análisis básico
 Slice 4 (Comparación) ← Depende de múltiples períodos de datos
     ↓
 Slice 5 (Plan de Choque) ← Depende de insights y progreso
+    ↓
+Slice 6 (Exportación) ← Depende de transacciones almacenadas (independiente de otros slices)
 ```
+
+**Nota sobre Slice 6**: El slice de exportación es técnicamente independiente de los slices 2-5, ya que solo requiere acceso a las transacciones almacenadas (Slice 1). Puede implementarse en paralelo con otros slices si se desea.
 
 Cada slice es desplegable independientemente y entrega valor incremental al usuario.
 
@@ -1194,34 +1348,244 @@ describe('Micro-Expense Classification', () => {
 
 ---
 
-## Future Enhancements (Post-MVP)
+## Roadmap: Próximos Slices (Post-MVP)
+
+### Slice 7: Chat con Asesor Financiero (IA)
+
+**Objetivo**: Usuario puede conversar con un asesor financiero virtual impulsado por IA para obtener respuestas personalizadas sobre sus finanzas.
+
+**Valor para el usuario**: Acceso inmediato a asesoría financiera contextualizada basada en su historial real de transacciones, sin necesidad de agendar citas o explicar su situación desde cero.
+
+**Alcance**:
+
+**Frontend (apps/web)**:
+- Panel de chat conversacional con interfaz tipo messenger
+- Burbujas de mensaje con animaciones de entrada (Framer Motion)
+- Indicador de "escribiendo..." mientras la IA genera respuesta
+- Historial de conversaciones persistente
+- Sugerencias de preguntas frecuentes (quick replies)
+- Botón flotante de acceso rápido al chat desde cualquier vista
+- Modo expandido/colapsado del panel de chat
+
+**Backend (apps/api)**:
+- POST /api/chat/message (enviar mensaje y recibir respuesta de IA)
+- GET /api/chat/history (obtener historial de conversaciones)
+- DELETE /api/chat/history (limpiar historial)
+- Integración con Google Gemini Flash para generación de respuestas
+- Sistema de contexto que incluye:
+  - Resumen de transacciones recientes del usuario
+  - Patrones de gasto detectados
+  - Planes de choque activos
+  - Progreso histórico
+- Prompt engineering para respuestas empáticas y accionables
+- Rate limiting para prevenir abuso (máximo 20 mensajes por hora)
+- Sanitización de inputs para prevenir prompt injection
+
+**Base de Datos**:
+- Colección `chatMessages` (userId, role, content, timestamp, context)
+- Colección `chatSessions` (userId, sessionId, startedAt, lastMessageAt)
+
+**Características del Chat**:
+- Respuestas contextualizadas basadas en datos reales del usuario
+- Ejemplos de preguntas que puede responder:
+  - "¿Por qué gasté más este mes que el anterior?"
+  - "¿Cuánto podría ahorrar si cancelo Netflix?"
+  - "¿En qué categoría gasto más los fines de semana?"
+  - "Dame consejos para reducir mis gastos en transporte"
+- Tono conversacional y empático (no técnico ni robótico)
+- Sugerencias de acciones concretas (crear plan de choque, revisar suscripciones)
+- Límite de 500 palabras por respuesta para mantener concisión
+
+**Cumplimiento Ley 1581**:
+- No se envían datos personales identificables a Gemini (solo agregados)
+- Usuario puede eliminar historial de chat en cualquier momento
+- Transparencia sobre uso de IA en las respuestas
+
+**Criterios de Éxito**:
+- ✅ Respuesta de IA en < 3 segundos
+- ✅ Respuestas relevantes y contextualizadas en > 90% de casos
+- ✅ Usuario puede mantener conversación multi-turno coherente
+- ✅ Interfaz de chat es intuitiva y responsiva
+- ✅ Historial se persiste correctamente
+
+**Duración Estimada**: 6 días
+
+---
+
+### Slice 8: Notificaciones y Alertas Inteligentes
+
+**Objetivo**: Sistema proactivo que avisa al usuario sobre eventos financieros importantes antes de que ocurran.
+
+**Valor para el usuario**: Prevenir sorpresas financieras y mantener al usuario en el camino hacia sus metas de ahorro.
+
+**Alcance**:
+
+**Frontend (apps/web)**:
+- Centro de notificaciones en dashboard (icono de campana con badge)
+- Panel deslizable con lista de notificaciones
+- Notificaciones in-app con animaciones de entrada
+- Categorización por tipo (suscripción, plan de choque, insight nuevo)
+- Marcar como leída/no leída
+- Configuración de preferencias de notificaciones
+- Notificaciones push (Web Push API)
+
+**Backend (apps/api)**:
+- GET /api/notifications (listar notificaciones del usuario)
+- PATCH /api/notifications/:id/read (marcar como leída)
+- POST /api/notifications/preferences (configurar preferencias)
+- Sistema de jobs programados (cron jobs con node-cron):
+  - Job diario: Detectar suscripciones próximas a vencer (3 días antes)
+  - Job diario: Verificar desvíos en planes de choque (> 20% sobre meta)
+  - Job semanal: Generar resumen semanal de gastos
+- Servicio de notificaciones (`notificationService.ts`)
+- Plantillas de notificaciones personalizables
+
+**Base de Datos**:
+- Colección `notifications` (userId, type, title, message, read, createdAt, actionUrl)
+- Colección `notificationPreferences` (userId, subscriptionAlerts, planAlerts, weeklyDigest, pushEnabled)
+
+**Tipos de Alertas**:
+
+1. **Alertas de Suscripciones**:
+   - "Netflix se cobrará en 3 días ($44.900 COP)"
+   - "Tienes 2 suscripciones que se cobrarán esta semana"
+
+2. **Alertas de Plan de Choque**:
+   - "⚠️ Vas 30% sobre tu meta de café este mes"
+   - "🎉 ¡Vas por buen camino! Llevas 50% de ahorro en tu plan"
+
+3. **Insights Nuevos**:
+   - "Detectamos un nuevo patrón de gasto que deberías revisar"
+   - "Tu progreso de este mes merece una celebración"
+
+4. **Resumen Semanal**:
+   - "Tu resumen semanal está listo: gastaste $X en Y categoría"
+
+**Canales de Notificación**:
+- In-app (siempre habilitado)
+- Web Push (opcional, requiere permiso del navegador)
+- Email (futuro, no en este slice)
+
+**Criterios de Éxito**:
+- ✅ Alertas de suscripciones se envían 3 días antes con > 95% precisión
+- ✅ Alertas de desvío en plan de choque se detectan en < 24 horas
+- ✅ Usuario puede configurar preferencias fácilmente
+- ✅ Notificaciones no son intrusivas ni abrumadoras (máximo 3 por día)
+- ✅ Centro de notificaciones es accesible y claro
+
+**Duración Estimada**: 5 días
+
+---
+
+### Slice 9: Gamificación y Logros
+
+**Objetivo**: Motivar al usuario mediante un sistema de recompensas visuales que celebra sus logros financieros.
+
+**Valor para el usuario**: Mantener motivación a largo plazo mediante celebraciones de progreso y reconocimiento de esfuerzos.
+
+**Alcance**:
+
+**Frontend (apps/web)**:
+- Sección "Mis Logros" en dashboard
+- Galería de insignias (badges) con animaciones de desbloqueo
+- Modal de celebración cuando se desbloquea un logro (confetti, animación especial)
+- Barra de progreso hacia próximo logro
+- Insignias bloqueadas (silueta gris) vs. desbloqueadas (color completo)
+- Tooltips explicando cómo desbloquear cada insignia
+- Contador de racha de días/semanas cumpliendo metas
+
+**Backend (apps/api)**:
+- GET /api/achievements (listar logros del usuario)
+- Sistema de detección automática de logros:
+  - Trigger al completar acciones (importar transacciones, crear plan, cumplir meta)
+  - Verificación periódica de condiciones (rachas, ahorros acumulados)
+- Servicio de logros (`achievementService.ts`)
+- Definición de logros en configuración (fácil de extender)
+
+**Base de Datos**:
+- Colección `achievements` (userId, achievementId, unlockedAt, progress)
+- Colección `achievementDefinitions` (id, name, description, icon, condition, tier)
+
+**Categorías de Logros**:
+
+1. **Logros de Inicio**:
+   - 🎯 "Primer Paso": Importar primera transacción
+   - 📊 "Explorador": Ver tu primer insight
+   - 💪 "Comprometido": Crear tu primer plan de choque
+
+2. **Logros de Racha**:
+   - 🔥 "Racha de 7 días": Cumplir meta 7 días seguidos
+   - 🔥🔥 "Racha de 30 días": Cumplir meta 30 días seguidos
+   - 🔥🔥🔥 "Racha de 90 días": Cumplir meta 90 días seguidos
+
+3. **Logros de Ahorro**:
+   - 💰 "Ahorrador Novato": Ahorrar $50.000 COP
+   - 💰💰 "Ahorrador Experto": Ahorrar $500.000 COP
+   - 💰💰💰 "Maestro del Ahorro": Ahorrar $1.000.000 COP
+
+4. **Logros de Categoría**:
+   - ☕ "Café en Casa": Reducir gastos en café en 50%
+   - 🚗 "Transporte Inteligente": Reducir gastos en transporte en 30%
+   - 📺 "Minimalista Digital": Cancelar 2+ suscripciones
+
+5. **Logros Especiales**:
+   - 🎉 "Mes Perfecto": Cumplir todas las metas del mes
+   - 🏆 "Transformación Total": Reducir gastos hormiga en 50% durante 3 meses
+   - 🌟 "Influencer Financiero": Compartir progreso (futuro)
+
+**Sistema de Tiers**:
+- Bronce: Logros básicos (fáciles de conseguir)
+- Plata: Logros intermedios (requieren constancia)
+- Oro: Logros avanzados (requieren dedicación)
+- Platino: Logros élite (muy difíciles de conseguir)
+
+**Animaciones y Celebraciones**:
+- Animación de desbloqueo con confetti y sonido (opcional)
+- Notificación in-app cuando se desbloquea un logro
+- Progreso visual hacia próximo logro en dashboard
+- Efecto de brillo en insignias recién desbloqueadas
+
+**Criterios de Éxito**:
+- ✅ Logros se detectan y desbloquean automáticamente en < 1 minuto
+- ✅ Animación de celebración es memorable y no intrusiva
+- ✅ Usuario entiende cómo desbloquear logros pendientes
+- ✅ Sistema de rachas motiva uso consistente de la app
+- ✅ Al menos 80% de usuarios desbloquean 3+ logros en primer mes
+
+**Duración Estimada**: 5 días
+
+---
+
+## Roadmap Extendido: Fases Futuras
 
 ### Fase 2: Integraciones Bancarias
 
 - Conexión directa con bancos colombianos vía Open Banking
 - Sincronización automática de transacciones (sin CSV manual)
 - Soporte para múltiples cuentas bancarias
+- Detección automática de nuevas transacciones
 
 ### Fase 3: IA Avanzada
 
-- Generación de narrativas con LLM (GPT-4, Claude)
-- Categorización con machine learning
-- Predicción de gastos futuros
+- Generación de narrativas con LLM avanzados (GPT-4, Claude)
+- Categorización con machine learning personalizado
+- Predicción de gastos futuros basada en patrones históricos
 - Recomendaciones personalizadas basadas en comportamiento
+- Detección de anomalías y fraudes
 
-### Fase 4: Social y Gamificación
+### Fase 4: Social y Comparación
 
 - Comparación anónima con promedios de usuarios similares
-- Logros y badges por metas alcanzadas
-- Desafíos mensuales de ahorro
+- Desafíos mensuales de ahorro comunitarios
 - Compartir progreso en redes sociales
+- Leaderboards de ahorro (opcional y anónimo)
 
-### Fase 5: Asesoría Financiera
+### Fase 5: Inversión y Crecimiento
 
-- Chat con asesor financiero virtual (IA)
-- Planes de ahorro personalizados
-- Recomendaciones de inversión básicas
-- Alertas proactivas de gastos inusuales
+- Recomendaciones de inversión básicas (CDTs, fondos)
+- Calculadora de metas financieras (viajes, compras grandes)
+- Simulador de escenarios financieros
+- Integración con plataformas de inversión colombianas
 
 ---
 
@@ -1231,6 +1595,10 @@ FinanceFlow AI representa una nueva forma de entender y gestionar gastos hormiga
 
 La arquitectura de monorepo con npm Workspaces facilita el desarrollo ágil y la reutilización de código, mientras que la estrategia de implementación por slices verticales permite entregar valor incremental y validar hipótesis de producto tempranamente.
 
-El cumplimiento estricto de la Ley 1581 de 2012 no es solo una obligación legal, sino un compromiso con la privacidad y seguridad de los datos financieros de nuestros usuarios colombianos.
+El cumplimiento estricto de la Ley 1581 de 2012 no es solo una obligación legal, sino un compromiso con la privacidad y seguridad de los datos financieros de nuestros usuarios colombianos. El Slice 6 de exportación de datos materializa este compromiso al permitir a los usuarios ejercer su derecho de acceso a datos personales de forma simple y transparente.
 
-Con un MVP enfocado en las capacidades core (importación, análisis, narrativas, y acciones), FinanceFlow AI está posicionado para diferenciarse en el mercado de finanzas personales mediante su enfoque único: **la IA como narradora de insights, no como tabla de datos**.
+**Estado Actual del MVP**: Con 6 slices verticales completados (Onboarding, Insights, Suscripciones, Progreso, Planes de Choque, y Exportación), FinanceFlow AI cuenta con un MVP robusto y funcional que entrega valor real a los usuarios colombianos.
+
+**Próximos Pasos**: Los Slices 7-9 (Chat con IA, Notificaciones, y Gamificación) están diseñados para aumentar el engagement y la retención de usuarios mediante interacciones más ricas y motivación continua.
+
+Con un MVP enfocado en las capacidades core (importación, análisis, narrativas, acciones, y control de datos), FinanceFlow AI está posicionado para diferenciarse en el mercado de finanzas personales mediante su enfoque único: **la IA como narradora de insights, no como tabla de datos**.
