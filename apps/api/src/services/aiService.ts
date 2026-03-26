@@ -219,7 +219,7 @@ GENERA LA NARRATIVA EN MARKDOWN:`;
 
     // Generar contenido usando OpenAI SDK
     const response = await openai.chat.completions.create({
-      model: "meta-llama/llama-3.1-8b-instruct:free",
+      model: "meta-llama/llama-3.1-8b-instruct",
       messages: [
         { role: "user", content: prompt }
       ],
@@ -307,7 +307,7 @@ GENERA EL ARRAY JSON:`;
     });
 
     const response = await openai.chat.completions.create({
-      model: "meta-llama/llama-3.1-8b-instruct:free",
+      model: "meta-llama/llama-3.1-8b-instruct",
       messages: [
         { role: "user", content: prompt }
       ],
