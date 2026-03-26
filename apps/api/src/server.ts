@@ -17,6 +17,7 @@ import statsRoutes from './routes/statsRoutes';
 import savingsPlanRoutes from './routes/savingsPlanRoutes';
 import exportRoutes from './routes/exportRoutes';
 import chatRoutes from './routes/chatRoutes';
+import notificationRoutes from './routes/notificationRoutes';
 
 const app: Application = express();
 const PORT = process.env.PORT || 4000;
@@ -53,6 +54,7 @@ app.use('/api/stats', statsRoutes);
 app.use('/api/plans', savingsPlanRoutes);
 app.use('/api/export', exportRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Ruta 404
 app.use((_req: Request, res: Response) => {

@@ -48,3 +48,10 @@ export {
   type ExportFormat,
   type ExportRequest
 } from './types/export';
+
+// Types de Notification
+export {
+  type Notification,
+  type NotificationPreference,
+  type NotificationType
+} from './types/notification';
