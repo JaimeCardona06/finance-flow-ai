@@ -8,6 +8,9 @@ export interface ISavingsPlan extends Document {
   startDate: Date;
   endDate: Date;
   status: 'active' | 'completed' | 'failed';
+  notified80?: boolean;      // Has 80% threshold been notified?
+  notified100?: boolean;     // Has 100% threshold been notified?
+  lastAlertDate?: Date;      // Last time any alert was sent
   createdAt: Date;
   updatedAt: Date;
   getProgressPercentage(): number;
@@ -51,6 +54,17 @@ const SavingsPlanSchema = new Schema<ISavingsPlan>(
       type: String,
       enum: ['active', 'completed', 'failed'],
       default: 'active'
+    },
+    notified80: {
+      type: Boolean,
+      default: false
+    },
+    notified100: {
+      type: Boolean,
+      default: false
+    },
+    lastAlertDate: {
+      type: Date
     }
   },
   {

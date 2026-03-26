@@ -9,6 +9,7 @@ import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { connectDB } from './config/db';
+import { initializeJobs, stopAllJobs } from './jobs';
 import authRoutes from './routes/authRoutes';
 import analysisRoutes from './routes/analysisRoutes';
 import transactionRoutes from './routes/transactionRoutes';
@@ -73,6 +74,9 @@ async function startServer() {
     // Conectar a MongoDB
     await connectDB();
 
+    // Inicializar cron jobs después de MongoDB
+    initializeJobs();
+
     // Iniciar servidor
     app.listen(PORT, () => {
       console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
@@ -89,10 +93,12 @@ startServer();
 // Manejo de shutdown graceful
 process.on('SIGTERM', () => {
   console.log('SIGTERM recibido, cerrando servidor...');
+  stopAllJobs();
   process.exit(0);
 });
 
 process.on('SIGINT', () => {
   console.log('SIGINT recibido, cerrando servidor...');
+  stopAllJobs();
   process.exit(0);
 });
