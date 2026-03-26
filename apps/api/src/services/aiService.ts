@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { savingsPlanService } from './savingsPlanService';
+import { formatCOPWithSuffix, calculateProgressPercentage, getStatusColor } from '../utils/financeUtils';
 
 /**
  * Persona del estratega financiero colombiano premium
@@ -17,8 +18,8 @@ interface TransactionSummary {
 }
 
 /**
- * Generar narrativa financiera usando Gemini 2.5 Flash
- * Implementación basada en la documentación oficial de Google AI
+ * Generar narrativa financiera usando Llama 3.1 a través de OpenRouter
+ * Modelo gratuito para cuidar el presupuesto
  * 
  * @param transactions - Array de transacciones del usuario
  * @param userId - ID del usuario para obtener sus planes activos
@@ -60,7 +61,7 @@ export async function generateNarrative(
     // Agrupar por categoría
     const categoryDetails = Object.entries(categories)
       .sort((a, b) => b[1] - a[1])
-      .map(([cat, amount]) => `${cat}: **${amount.toLocaleString('es-CO')} COP**`)
+      .map(([cat, amount]) => `${cat}: **${formatCOPWithSuffix(amount)}**`)
       .join(', ');
 
     // Identificar el gasto más frecuente
@@ -91,9 +92,9 @@ export async function generateNarrative(
 
       historicalContext = `
 CONTEXTO HISTÓRICO (COMPARACIÓN MENSUAL):
-- Mes actual (${formatMonth(currentMonth.month)}): **${currentMonth.totalAmount.toLocaleString('es-CO')} COP**
-- Mes anterior (${formatMonth(previousMonth.month)}): **${previousMonth.totalAmount.toLocaleString('es-CO')} COP**
-- Diferencia: **${delta.amount > 0 ? '+' : ''}${delta.amount.toLocaleString('es-CO')} COP** (${delta.percentage > 0 ? '+' : ''}${delta.percentage.toFixed(1)}%)
+- Mes actual (${formatMonth(currentMonth.month)}): **${formatCOPWithSuffix(currentMonth.totalAmount)}**
+- Mes anterior (${formatMonth(previousMonth.month)}): **${formatCOPWithSuffix(previousMonth.totalAmount)}**
+- Diferencia: **${delta.amount > 0 ? '+' : ''}${formatCOPWithSuffix(delta.amount)}** (${delta.percentage > 0 ? '+' : ''}${delta.percentage.toFixed(1)}%)
 - Tendencia: ${delta.trend === 'down' ? '📉 Reducción' : delta.trend === 'up' ? '📈 Aumento' : '➡️ Estable'}
 - ${improvement ? '✅ MEJORA DETECTADA: El usuario redujo sus gastos' : '⚠️ Los gastos aumentaron respecto al mes anterior'}
 `;
@@ -118,7 +119,7 @@ ${activePlans.map(plan => {
               : '🚨 LÍMITE SUPERADO';
 
           return `${statusEmoji} **${plan.category.toUpperCase()}**: ${plan.progressPercentage}% (${statusText})
-   - Gastado: **${plan.currentAmount.toLocaleString('es-CO')} COP** de **${plan.targetAmount.toLocaleString('es-CO')} COP**
+   - Gastado: **${formatCOPWithSuffix(plan.currentAmount)}** de **${formatCOPWithSuffix(plan.targetAmount)}**
    - Días restantes: ${plan.daysRemaining}
    - Estado: ${plan.statusColor === 'green' ? '✅ Bien encaminado' : plan.statusColor === 'yellow' ? '⚠️ Requiere atención inmediata' : '❌ Meta fallida este período'}`;
         }).join('\n\n')}
@@ -127,19 +128,19 @@ ${activePlans.map(plan => {
 ${activePlans.some(p => p.statusColor === 'red') ? `
 🚨 **METAS EN ROJO (>= 100%):**
 ${activePlans.filter(p => p.statusColor === 'red').map(p =>
-          `- **${p.category}**: Superaste el límite en **${(p.currentAmount - p.targetAmount).toLocaleString('es-CO')} COP**. Reconoce el exceso sin juzgar. Motiva a ajustar el límite o reducir gastos para el próximo período. Usa un tono de "aprendizaje" no de "fracaso".`
+          `- **${p.category}**: Superaste el límite en **${formatCOPWithSuffix(p.currentAmount - p.targetAmount)}**. Reconoce el exceso sin juzgar. Motiva a ajustar el límite o reducir gastos para el próximo período. Usa un tono de "aprendizaje" no de "fracaso".`
         ).join('\n')}
 ` : ''}
 ${activePlans.some(p => p.statusColor === 'yellow') ? `
 🟡 **METAS EN AMARILLO (80-99%) - ALERTA PROACTIVA:**
 ${activePlans.filter(p => p.statusColor === 'yellow').map(p =>
-          `- **${p.category}**: Estás al ${p.progressPercentage}% del límite (**${p.currentAmount.toLocaleString('es-CO')} COP** de **${p.targetAmount.toLocaleString('es-CO')} COP**). Solo quedan **${(p.targetAmount - p.currentAmount).toLocaleString('es-CO')} COP** de margen y ${p.daysRemaining} días. GENERA UN "PLAN DE EMERGENCIA" ESPECÍFICO: sugiere acciones concretas para no superar el límite (ej: "Evita domicilios esta semana", "Usa transporte público los próximos días").`
+          `- **${p.category}**: Estás al ${p.progressPercentage}% del límite (**${formatCOPWithSuffix(p.currentAmount)}** de **${formatCOPWithSuffix(p.targetAmount)}**). Solo quedan **${formatCOPWithSuffix(p.targetAmount - p.currentAmount)}** de margen y ${p.daysRemaining} días. GENERA UN "PLAN DE EMERGENCIA" ESPECÍFICO: sugiere acciones concretas para no superar el límite (ej: "Evita domicilios esta semana", "Usa transporte público los próximos días").`
         ).join('\n')}
 ` : ''}
 ${activePlans.some(p => p.statusColor === 'green') ? `
 🟢 **METAS EN VERDE (< 80%):**
 ${activePlans.filter(p => p.statusColor === 'green').map(p =>
-          `- **${p.category}**: Vas excelente al ${p.progressPercentage}% del límite. Felicita al usuario por mantener la disciplina. Menciona cuánto margen le queda (**${(p.targetAmount - p.currentAmount).toLocaleString('es-CO')} COP**) y motívalo a mantener el ritmo.`
+          `- **${p.category}**: Vas excelente al ${p.progressPercentage}% del límite. Felicita al usuario por mantener la disciplina. Menciona cuánto margen le queda (**${formatCOPWithSuffix(p.targetAmount - p.currentAmount)}**) y motívalo a mantener el ritmo.`
         ).join('\n')}
 ` : ''}
 
@@ -157,15 +158,15 @@ ${activePlans.filter(p => p.statusColor === 'green').map(p =>
 Analiza las transacciones y genera una narrativa profesional de máximo 2 párrafos. Identifica ineficiencias en el flujo de caja y cuantifica oportunidades de optimización.
 
 DATOS CLAVE:
-- Capital total desembolsado: **${totalAmount.toLocaleString('es-CO')} COP**
+- Capital total desembolsado: **${formatCOPWithSuffix(totalAmount)}**
 - Número de transacciones: ${transactions.length}
-- Ticket promedio: **${Math.round(avgAmount).toLocaleString('es-CO')} COP**
+- Ticket promedio: **${formatCOPWithSuffix(Math.round(avgAmount))}**
 
 DESGLOSE POR CATEGORÍA:
 ${categoryDetails}
 
 COMERCIO MÁS FRECUENTE:
-- **${topMerchant?.[0] || 'N/A'}**: ${topMerchant?.[1].count || 0} transacciones, **${(topMerchant?.[1].total || 0).toLocaleString('es-CO')} COP** acumulados
+- **${topMerchant?.[0] || 'N/A'}**: ${topMerchant?.[1].count || 0} transacciones, **${formatCOPWithSuffix(topMerchant?.[1].total || 0)}** acumulados
 
 ${historicalContext}
 
@@ -173,7 +174,7 @@ ${plansContext}
 
 TODAS LAS TRANSACCIONES:
 ${transactions.map(t =>
-      `- **${t.description}**: ${t.amount.toLocaleString('es-CO')} COP`
+      `- **${t.description}**: ${formatCOPWithSuffix(t.amount)}`
     ).join('\n')}
 
 INSTRUCCIONES CRÍTICAS:
@@ -218,7 +219,7 @@ GENERA LA NARRATIVA EN MARKDOWN:`;
 
     // Generar contenido usando OpenAI SDK
     const response = await openai.chat.completions.create({
-      model: "google/gemini-2.5-flash",
+      model: "meta-llama/llama-3.1-8b-instruct:free",
       messages: [
         { role: "user", content: prompt }
       ],
@@ -230,24 +231,24 @@ GENERA LA NARRATIVA EN MARKDOWN:`;
     return narrative.trim();
 
   } catch (error) {
-    console.error('Error al generar narrativa con Gemini:', error);
+    console.error('Error al generar narrativa con Llama 3.1:', error);
 
     const totalAmount = transactions.reduce((sum, t) => sum + t.amount, 0);
 
     // Fallback: narrativa básica sin IA
     return `⚠️ **Análisis básico (sin IA)**
 
-He analizado tus ${transactions.length} transacciones por un total de **${totalAmount.toLocaleString('es-CO')} COP**.
+He analizado tus ${transactions.length} transacciones por un total de **${formatCOPWithSuffix(totalAmount)}**.
 
 **Gastos principales:**
-${transactions.slice(0, 5).map(t => `- **${t.description}**: ${t.amount.toLocaleString('es-CO')} COP`).join('\n')}
+${transactions.slice(0, 5).map(t => `- **${t.description}**: ${formatCOPWithSuffix(t.amount)}`).join('\n')}
 
-**Nota:** La conexión con Gemini falló. Verifica que tu API Key sea válida y esté generada desde [Google AI Studio](https://aistudio.google.com/app/apikey).`;
+**Nota:** La conexión con OpenRouter falló. Verifica tu conexión a internet e intenta de nuevo.`;
   }
 }
 
 /**
- * Extraer transacciones desde lenguaje natural usando Gemini
+ * Extraer transacciones desde lenguaje natural usando Llama 3.1
  * Soporta jerga colombiana: "50k", "50 lucas", múltiples gastos separados por comas
  * 
  * @param text - Texto del usuario describiendo sus gastos
@@ -342,7 +343,7 @@ GENERA EL ARRAY JSON:`;
     return validTransactions;
 
   } catch (error) {
-    console.error('Error al extraer transacciones con Gemini:', error);
+    console.error('Error al extraer transacciones con Llama 3.1:', error);
     throw error;
   }
 }

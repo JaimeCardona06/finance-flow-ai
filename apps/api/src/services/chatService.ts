@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import mongoose from 'mongoose';
 import { Transaction } from '../models/Transaction';
 import { savingsPlanService } from './savingsPlanService';
+import { formatCOPWithSuffix, calculateProgressPercentage, getStatusColor } from '../utils/financeUtils';
 
 /**
  * Persona del estratega financiero colombiano premium
@@ -116,7 +117,7 @@ export async function processChatMessage(
 
     const categorySummary = Object.entries(categoryTotals)
       .sort((a, b) => b[1] - a[1])
-      .map(([cat, amount]) => `- **${cat}**: ${amount.toLocaleString('es-CO')} COP (${categoryCount[cat]} transacciones)`)
+      .map(([cat, amount]) => `- **${cat}**: ${formatCOPWithSuffix(amount)} (${categoryCount[cat]} transacciones)`)
       .join('\n');
 
     // Identificar merchants más frecuentes
@@ -134,7 +135,7 @@ export async function processChatMessage(
     const topMerchants = Object.entries(merchantTotals)
       .sort((a, b) => b[1].total - a[1].total)
       .slice(0, 5)
-      .map(([merchant, data]) => `- **${merchant}**: ${data.total.toLocaleString('es-CO')} COP (${data.count} veces)`)
+      .map(([merchant, data]) => `- **${merchant}**: ${formatCOPWithSuffix(data.total)} (${data.count} veces)`)
       .join('\n');
 
     // Obtener planes activos del usuario (Slice 5 - Integración con Chat)
@@ -175,17 +176,10 @@ export async function processChatMessage(
           }).lean();
 
           const realCurrentAmount = categoryTransactions.reduce((sum, t) => sum + t.amount, 0);
-          const realProgressPercentage = Math.round((realCurrentAmount / plan.targetAmount) * 100);
+          const realProgressPercentage = calculateProgressPercentage(realCurrentAmount, plan.targetAmount);
           
           // Determinar color basado en progreso REAL
-          let realStatusColor: 'green' | 'yellow' | 'red';
-          if (realProgressPercentage >= 100) {
-            realStatusColor = 'red';
-          } else if (realProgressPercentage >= 80) {
-            realStatusColor = 'yellow';
-          } else {
-            realStatusColor = 'green';
-          }
+          const realStatusColor = getStatusColor(realProgressPercentage);
 
           // Calcular días restantes del mes
           const today = new Date();
@@ -226,8 +220,8 @@ ${plansWithRealProgress.map(plan => {
           const overspend = plan.currentAmount - plan.targetAmount;
 
           return `${statusEmoji} **${plan.category.toUpperCase()}**: ${plan.progressPercentage}% (${statusText})
-   - Gastado este mes: **${plan.currentAmount.toLocaleString('es-CO')} COP** de **${plan.targetAmount.toLocaleString('es-CO')} COP**
-   ${overspend > 0 ? `- **SOBREGIRO**: **${overspend.toLocaleString('es-CO')} COP** por encima del límite` : `- Margen restante: **${(plan.targetAmount - plan.currentAmount).toLocaleString('es-CO')} COP**`}
+   - Gastado este mes: **${formatCOPWithSuffix(plan.currentAmount)}** de **${formatCOPWithSuffix(plan.targetAmount)}**
+   ${overspend > 0 ? `- **SOBREGIRO**: **${formatCOPWithSuffix(overspend)}** por encima del límite` : `- Margen restante: **${formatCOPWithSuffix(plan.targetAmount - plan.currentAmount)}**`}
    - Días restantes del mes: ${plan.daysRemaining}
    - Estado: ${plan.statusColor === 'green' ? '✅ Bien encaminado' : plan.statusColor === 'yellow' ? '⚠️ Requiere atención inmediata' : '❌ Meta fallida este mes'}`;
         }).join('\n\n')}
@@ -237,8 +231,8 @@ ${plansWithRealProgress.some(p => p.statusColor === 'red') ? `
 🚨 **PLANES EN ROJO (>= 100%) - SÉ DIRECTO Y FIRME:**
 ${plansWithRealProgress.filter(p => p.statusColor === 'red').map(p => {
           const overspend = p.currentAmount - p.targetAmount;
-          return `- **${p.category}**: El usuario quería limitarse a **${p.targetAmount.toLocaleString('es-CO')} COP**, pero este mes ya lleva **${p.currentAmount.toLocaleString('es-CO')} COP**. Está en sobregiro por **${overspend.toLocaleString('es-CO')} COP**.
-  * **TONO DIRECTO**: "Veo que quieres limitarte a ${p.targetAmount.toLocaleString('es-CO')} COP en ${p.category}, pero este mes ya llevas ${p.currentAmount.toLocaleString('es-CO')} COP. Estás en sobregiro por ${overspend.toLocaleString('es-CO')} COP."
+          return `- **${p.category}**: El usuario quería limitarse a **${formatCOPWithSuffix(p.targetAmount)}**, pero este mes ya lleva **${formatCOPWithSuffix(p.currentAmount)}**. Está en sobregiro por **${formatCOPWithSuffix(overspend)}**.
+  * **TONO DIRECTO**: "Veo que quieres limitarte a ${formatCOPWithSuffix(p.targetAmount)} en ${p.category}, pero este mes ya llevas ${formatCOPWithSuffix(p.currentAmount)}. Estás en sobregiro por ${formatCOPWithSuffix(overspend)}."
   * **NO SUGIERAS FLEXIBILIDAD**: No digas "está bien" o "puedes ajustar". Sé firme.
   * **ENFOQUE EN DISCIPLINA**: Sugiere recortes drásticos para el próximo mes. Ejemplo: "Para el próximo mes, necesitas disciplina: reduce ${p.category} a la mitad o elimínalo por completo."
   * **CONSECUENCIAS**: Menciona el impacto anual si continúa así.`;
@@ -247,7 +241,7 @@ ${plansWithRealProgress.filter(p => p.statusColor === 'red').map(p => {
 ${plansWithRealProgress.some(p => p.statusColor === 'yellow') ? `
 🟡 **PLANES EN AMARILLO (80-99%) - ALERTA PROACTIVA:**
 ${plansWithRealProgress.filter(p => p.statusColor === 'yellow').map(p =>
-          `- **${p.category}**: Estás al ${p.progressPercentage}% del límite (**${p.currentAmount.toLocaleString('es-CO')} COP** de **${p.targetAmount.toLocaleString('es-CO')} COP**). Solo quedan **${(p.targetAmount - p.currentAmount).toLocaleString('es-CO')} COP** de margen y ${p.daysRemaining} días del mes.
+          `- **${p.category}**: Estás al ${p.progressPercentage}% del límite (**${formatCOPWithSuffix(p.currentAmount)}** de **${formatCOPWithSuffix(p.targetAmount)}**). Solo quedan **${formatCOPWithSuffix(p.targetAmount - p.currentAmount)}** de margen y ${p.daysRemaining} días del mes.
   * **GENERA UN "PLAN DE EMERGENCIA" ESPECÍFICO**: Sugiere acciones concretas para no superar el límite (ej: "Evita ${p.category} completamente esta semana", "Usa alternativas más económicas los próximos ${p.daysRemaining} días").
   * **SÉ URGENTE**: Usa frases como "URGENTE", "CRÍTICO", "ÚLTIMOS DÍAS".`
         ).join('\n\n')}
@@ -255,7 +249,7 @@ ${plansWithRealProgress.filter(p => p.statusColor === 'yellow').map(p =>
 ${plansWithRealProgress.some(p => p.statusColor === 'green') ? `
 🟢 **PLANES EN VERDE (< 80%):**
 ${plansWithRealProgress.filter(p => p.statusColor === 'green').map(p =>
-          `- **${p.category}**: Vas excelente al ${p.progressPercentage}% del límite. Felicita al usuario por mantener la disciplina. Menciona cuánto margen le queda (**${(p.targetAmount - p.currentAmount).toLocaleString('es-CO')} COP**) y motívalo a mantener el ritmo.`
+          `- **${p.category}**: Vas excelente al ${p.progressPercentage}% del límite. Felicita al usuario por mantener la disciplina. Menciona cuánto margen le queda (**${formatCOPWithSuffix(p.targetAmount - p.currentAmount)}**) y motívalo a mantener el ritmo.`
         ).join('\n\n')}
 ` : ''}
 
@@ -276,9 +270,9 @@ ${plansWithRealProgress.filter(p => p.statusColor === 'green').map(p =>
 CONTEXTO FINANCIERO DEL USUARIO (ÚLTIMOS 30 DÍAS):
 
 📊 RESUMEN GENERAL:
-- Total gastado: **${totalAmount.toLocaleString('es-CO')} COP**
+- Total gastado: **${formatCOPWithSuffix(totalAmount)}**
 - Número de transacciones: ${transactionCount}
-- Promedio por transacción: **${Math.round(totalAmount / transactionCount).toLocaleString('es-CO')} COP**
+- Promedio por transacción: **${formatCOPWithSuffix(Math.round(totalAmount / transactionCount))}**
 
 📁 GASTOS POR CATEGORÍA:
 ${categorySummary}
@@ -288,7 +282,7 @@ ${topMerchants}
 
 📝 ÚLTIMAS 10 TRANSACCIONES:
 ${transactions.slice(0, 10).map(t => 
-  `- **${t.description}**: ${t.amount.toLocaleString('es-CO')} COP (${new Date(t.date).toLocaleDateString('es-CO')})`
+  `- **${t.description}**: ${formatCOPWithSuffix(t.amount)} (${new Date(t.date).toLocaleDateString('es-CO')})`
 ).join('\n')}
 
 ${plansContext}
@@ -301,7 +295,7 @@ INSTRUCCIONES PARA RESPONDER:
 5. **CRÍTICO**: Si hay planes de ahorro activos, DEBES mencionarlos en tu respuesta
 6. **PRIORIDAD**: Si hay planes en rojo (🔴) o amarillo (🟡), prioriza dar consejos sobre esas categorías
 7. Siempre termina con una sugerencia accionable
-8. Usa markdown para resaltar cifras: **${totalAmount.toLocaleString('es-CO')} COP**
+8. Usa markdown para resaltar cifras: **${formatCOPWithSuffix(totalAmount)}**
 9. Máximo 300 palabras en tu respuesta
 10. Si no tienes datos suficientes para responder, dilo claramente
 
