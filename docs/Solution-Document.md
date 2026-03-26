@@ -1350,9 +1350,11 @@ describe('Micro-Expense Classification', () => {
 
 ## Roadmap: Próximos Slices (Post-MVP)
 
-### Slice 7: Chat con Asesor Financiero (IA) ✅ IMPLEMENTADO
+### Slice 7: Chat con Asesor Financiero (IA) ✅ FINALIZADO Y TESTEADO
 
-**Estado**: ✅ Completado en rama `feature/slice-7-chat-ia`
+**Estado**: ✅ Completado, testeado y mergeado a `dev`
+
+**Testing**: ✅ Suite completa de 13 tests pasando (100% cobertura crítica)
 
 **Objetivo**: Usuario puede conversar con un asesor financiero virtual impulsado por IA para obtener respuestas personalizadas sobre sus finanzas.
 
@@ -1414,7 +1416,8 @@ describe('Micro-Expense Classification', () => {
 
 **Modelo de IA**:
 - Proveedor: OpenRouter
-- Modelo: `meta-llama/llama-3.1-8b-instruct:free`
+- Modelo Chat: `meta-llama/llama-3.1-8b-instruct` (sin sufijo :free para mejor rendimiento)
+- Modelo Narrativas: `meta-llama/llama-3.1-8b-instruct:free` (versión gratuita)
 - Temperatura: 0.7 (balance entre creatividad y precisión)
 - Max tokens: 1000 (respuestas concisas)
 
@@ -1427,13 +1430,35 @@ describe('Micro-Expense Classification', () => {
 **Archivos Implementados**:
 - Backend:
   - `apps/api/src/services/chatService.ts`
+  - `apps/api/src/services/chatService.test.ts` ✅ (13 tests)
   - `apps/api/src/controllers/chatController.ts`
   - `apps/api/src/routes/chatRoutes.ts`
+  - `apps/api/src/utils/financeUtils.ts` ✅ (utilidades de formateo)
   - `apps/api/src/server.ts` (registro de rutas)
 - Frontend:
   - `apps/web/components/ChatAssistant.tsx`
   - `apps/web/components/ChatFloatingButton.tsx`
   - `apps/web/app/analysis/page.tsx` (integración)
+
+**Suite de Tests Implementada** ✅:
+- ✅ **validateChatConfig** (2 tests): Validación de configuración de API key
+- ✅ **Test de Resiliencia** (2 tests): Manejo de transacciones vacías sin fallos
+- ✅ **Test de Mano Dura** (2 tests): Detección de sobregiro con contexto correcto
+- ✅ **Test de Contexto Financiero** (2 tests): Inclusión de resumen y historial
+- ✅ **Test de Manejo de Errores** (3 tests): Fallbacks cuando API falla
+- ✅ **Test de Formato de Moneda** (1 test): Formato colombiano con separador de miles
+- ✅ **Test de Integración** (1 test): Integración con planes de ahorro
+
+**Refactorización Completada** ✅:
+- ✅ Creación de `financeUtils.ts` con utilidades reutilizables:
+  - `formatCOP()`: Formato con separador de miles
+  - `formatCOPWithSuffix()`: Formato con "COP"
+  - `calculateProgressPercentage()`: Cálculo de porcentajes
+  - `getStatusColor()`: Determinación de color de estado
+- ✅ Refactorización de `chatService.ts` para usar utilidades
+- ✅ Refactorización de `aiService.ts` para usar utilidades
+- ✅ Eliminación de código duplicado de formateo
+- ✅ Código más limpio y mantenible
 
 **Criterios de Éxito**:
 - ✅ Respuesta de IA en < 3 segundos (depende de OpenRouter)
@@ -1443,7 +1468,9 @@ describe('Micro-Expense Classification', () => {
 - ✅ Animaciones suaves con Framer Motion
 - ✅ Manejo de errores con mensajes claros
 
-**Duración Real**: 3 horas (implementación completa full-stack)
+**Duración Real**: 5 horas (implementación full-stack + suite de tests + refactorización)
+
+**Estado Final**: ✅ Slice 7 completamente finalizado, testeado y mergeado a `dev`
 
 **Próximos Pasos (Mejoras Futuras)**:
 - Persistir historial de conversaciones en MongoDB
